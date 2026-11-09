@@ -792,7 +792,9 @@ def _url_payload_command(n: int) -> str:
 #: ``bounded_judgment``, one shared budget of resolver wait that every off-loop
 #: request checks before it is sent and that clamps only candidate waits; and the
 #: three lines the ``paths`` facade's manifest lists for them. No check was relaxed.
-_PACKAGE_LINE_BUDGET = 35_804
+#: Raised by 3, from 35,804, for the ``chat_steering_off.json`` leaf on the read-gate
+#: floor in ``paths_lists`` (per-chat steering switch-offs). Re-measured.
+_PACKAGE_LINE_BUDGET = 35_807
 
 #: Ceiling on any ONE file in the package. This is what the bound is really for --
 #: a package total says nothing about a single file growing back into a second
