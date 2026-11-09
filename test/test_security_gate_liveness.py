@@ -792,7 +792,16 @@ def _url_payload_command(n: int) -> str:
 #: ``bounded_judgment``, one shared budget of resolver wait that every off-loop
 #: request checks before it is sent and that clamps only candidate waits; and the
 #: three lines the ``paths`` facade's manifest lists for them. No check was relaxed.
-_PACKAGE_LINE_BUDGET = 35_804
+#: Raised by 1085, from 35,804, to 36,889, for the self-kill floor's ``git grep``
+#: pager read, in its own owner module ``argv_floor_pager``: the last ``-O`` and its ``--no-``
+#: form, the last ``core.pager`` / ``pager.grep`` from ``-c``, ``--config-env`` and
+#: ``GIT_CONFIG_*`` words, ``GIT_PAGER`` / ``PAGER`` unless ``-P``, an inline alias
+#: chain, ``find -exec``, here-documents fed to a shell, and the floor's own pass
+#: over array assignments under an expansion budget, with candidate caps that
+#: count only values that could carry a pager; the walk's opt-in shell-name
+#: fold for that read; the walk's shared tokenization; and the
+#: facade's type-checker imports of its names. Re-measured.
+_PACKAGE_LINE_BUDGET = 36_889
 
 #: Ceiling on any ONE file in the package. This is what the bound is really for --
 #: a package total says nothing about a single file growing back into a second
