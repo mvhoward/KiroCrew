@@ -792,7 +792,11 @@ def _url_payload_command(n: int) -> str:
 #: ``bounded_judgment``, one shared budget of resolver wait that every off-loop
 #: request checks before it is sent and that clamps only candidate waits; and the
 #: three lines the ``paths`` facade's manifest lists for them. No check was relaxed.
-_PACKAGE_LINE_BUDGET = 35_804
+#: Raised by 40, from 35,804, for the deny view's Windows program-suffix view (at the
+#: program word, past ``sudo``-style wrappers and ``cmd /c``), the in-word ``^``/backtick
+#: view and the ``aws.exe`` spelling in the s3 download reader. Views only add matches;
+#: nothing is relaxed. Re-measured.
+_PACKAGE_LINE_BUDGET = 35_844
 
 #: Ceiling on any ONE file in the package. This is what the bound is really for --
 #: a package total says nothing about a single file growing back into a second
