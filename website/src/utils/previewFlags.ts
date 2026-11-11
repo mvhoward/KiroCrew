@@ -258,6 +258,13 @@ export const PREVIEW_DASHBOARD_STALE_WAKE = `${PREVIEW_FLAG_PREFIX}dashboard-sta
 export const PREVIEW_CHAT_RUNTIME_SHARING = `${PREVIEW_FLAG_PREFIX}chat-runtime-sharing`
 
 /**
+ * Visual refresh: a restyle of the dashboard that lands on `main` in pieces.
+ * Default OFF, and OFF is the dashboard as it is on `main`. Nothing reads it
+ * yet; shipping the refresh to everyone (retiring the flag) is its own decision.
+ */
+export const PREVIEW_VISUAL_REFRESH = `${PREVIEW_FLAG_PREFIX}visual-refresh`
+
+/**
  * Every live preview-flag key, the ones the gateway keeps. Each one's name (see
  * {@link previewFlagName}) is a writable `dashboard.feature_previews.<name>` path
  * in the gateway config; `test_feature_previews_config.py` pins this list equal
@@ -281,6 +288,7 @@ export const PREVIEW_FLAGS: readonly string[] = [
   PREVIEW_DASHBOARD_STALE_WAKE,
   PREVIEW_BRIDGE_APPROVALS,
   PREVIEW_CHAT_RUNTIME_SHARING,
+  PREVIEW_VISUAL_REFRESH,
 ]
 
 /**
