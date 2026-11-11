@@ -10,6 +10,7 @@ import { askUi, useAskSurface } from './askUi'
 import { answerErrorText, isSignInTakeover, originHost, QuickAskTargetRing, takesOver, zoomStyle } from './QuickAskParts'
 import QuickAskInline from './QuickAskInline'
 import QuickAskSheet from './QuickAskSheet'
+import { VaultUnsavedNotice } from './QuickAskVault'
 import type { QuickAsk } from './types'
 
 export interface QuickAskSlots {
@@ -34,6 +35,9 @@ export function useQuickAsk(sessionKey: string, ask: QuickAsk | null, priority: 
   const instanceId = useId()
   const isMobile = useIsMobile()
   const view = useAskSurface(instanceId, ask?.id ?? null, priority)
+  if (!ask && askUi.isUnsaved(sessionKey)) {
+    return { ...NONE, askSlot: <VaultUnsavedNotice sessionKey={sessionKey} /> }
+  }
   if (!ask || view === 'none') return NONE
   if (takesOver(ask) && ask.phase === 'taken_over') {
     return { frameOverlay: null, askSlot: <QuickAskTakeoverBar key={ask.id} ask={ask} sessionKey={sessionKey} />, zoom: zoomStyle(ask), scoped: true }

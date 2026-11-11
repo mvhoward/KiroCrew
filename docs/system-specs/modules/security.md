@@ -1273,6 +1273,24 @@ Security properties:
   has that revision (check and delete under one store lock, `409 changed`
   otherwise). A change card's Undo of a secret it saved uses it, so a value saved
   over it since is never deleted in its place.
+- **Browser sign-in reads a login inside the gateway only.** Under the
+  `secrets_vault` feature preview, a browser `credentials` quick ask may be
+  answered from a vault login (`browser_harness/vault_fill.py`; see
+  [browser](browser.md), "Sign-in from the Secrets vault"). This is no read-back
+  path: the owner's card receives each matching login's entry name and username,
+  never a password; the person's click on the owner-only
+  `POST /api/browser/ask/answer` (internal secret refused) names one, and the
+  gateway reads its username and password and writes them straight into the
+  bound, re-verified page field. The agent's `ask` op and its outcome words do
+  not change, and no password or username reaches the agent, a log, the SEL, the
+  replay or the live event. A login is offered by base domain (eTLD+1 from the
+  bundled Public Suffix List), exact host and port where there is none, and never
+  from https onto an http page. The same quick ask stores what the person TYPED
+  only when they ticked "Save to vault" (off by default, offered whenever they
+  type, beside a match too), only after the fill landed, and only as a new item
+  (`SecretVault.add_item_under_free_name` picks a free name under the store
+  lock, so nothing is overwritten). One SEL row per vault fill and per save
+  names the item and the origin.
 - **Sandbox-hidden.** The `.vault` directory sits under the crew data home,
   which the OS-level sandbox bind-mounts away from the agent subprocess tree,
   so the agent cannot read the ciphertext off disk either. On Linux a mount

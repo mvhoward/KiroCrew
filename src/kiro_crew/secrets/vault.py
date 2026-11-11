@@ -289,6 +289,35 @@ class SecretVault:
         self._write_store(_mutate)
         return entry_revision(written)
 
+    async def add_item_under_free_name(
+        self, base: str, item_type: str, fields: Mapping[str, Any]
+    ) -> str:
+        """Store a NEW typed item under *base*, else ``base (2)``, ``base (3)``, ...
+
+        Never overwrites: the first name no entry holds is picked inside the
+        store's cross-process lock, so a writer that took *base* a moment earlier
+        keeps it. The item is validated before the lock is taken (an invalid one
+        raises :class:`~kiro_crew.secrets.items.ItemError` and nothing is
+        written). Returns the name used.
+        """
+        plaintext = _items.encode_item(item_type, fields).encode("utf-8")
+        async with self._lock:
+            return await asyncio.to_thread(self._add_item_sync, base, item_type, plaintext)
+
+    def _add_item_sync(self, base: str, item_type: str, plaintext: bytes) -> str:
+        used: list[str] = []
+
+        def _mutate(entries: dict) -> dict:
+            name, n = base, 1
+            while name in entries:
+                n += 1
+                name = f"{base} ({n})"
+            used.append(name)
+            return {**entries, name: self._encrypt_entry(name, plaintext, item_type)}
+
+        self._write_store(_mutate)
+        return used[0]
+
     def get_many(self, names: list[str]) -> dict[str, Optional[SecretValue]]:
         """Batch-retrieve secrets, loading the store and key exactly once.
 
