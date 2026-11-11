@@ -12886,6 +12886,7 @@
         "retry_turn_stalled": "Turno bloccato — riprendi da dove si è fermato.",
         "retry_tool_stalled": "Lo strumento sembra bloccato — riprendi da dove si è fermato.",
         "retry_backend_hiccup": "L’agente ha avuto un problema momentaneo — riprendi da dove si è fermato.",
+        "retry_kas_signed_in": "Accesso a Kiro effettuato — riprendi per inviare di nuovo il messaggio.",
         "default_model": "Cambia il modello predefinito",
         "default_model_hint": "Apri Impostazioni → Chat → Modello predefinito. Le nuove sessioni partono da questo valore.",
         "turn_limit": "Cambia il limite di tempo per turno",

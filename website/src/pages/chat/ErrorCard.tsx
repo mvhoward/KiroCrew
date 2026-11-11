@@ -4,6 +4,7 @@ import { ExternalLink, KeyRound, Loader2, MessageSquarePlus, RotateCw, Settings,
 
 import { ApiError, apiErrorCode } from '../../api/apiError'
 import ErrorNotice from '../../components/ErrorNotice'
+import { reportForError } from '../../utils/errorReport'
 // The shared two-step restart control. Its module holds only the About panel's
 // update actions (shared components and the api client), not the Settings page.
 import { RestartGatewayButton } from '../settings/AboutPanelUpdateFlow'
@@ -278,12 +279,23 @@ export interface ErrorCardProps {
   /**
    * The fix affordance for an `auth_required` row: deep link to the Kiro
    * sign-in card in Settings, where the user signs in to Kiro Crew's own
-   * identity again. Offered INSTEAD of Continue for the same reason as the
-   * entitlement actions -- a retry hits the same signed-out wall -- and on
-   * EVERY such row, because a lapsed sign-in is settled state the user still
-   * has to act on. Omitted on a surface with no settings route (embed, popout).
+   * identity again. Offered INSTEAD of Continue (until `signInWorks`) for the
+   * same reason as the entitlement actions -- a retry hits the same signed-out
+   * wall -- and on EVERY such row, because a lapsed sign-in is settled state
+   * the user still has to act on. Omitted on a surface with no settings route (embed, popout).
    */
   onOpenSignIn?: () => void
+  /**
+   * True on an `auth_required` row whose sign-in the host has read as working
+   * again: the card keeps its Sign in button and adds `onContinue`'s Resume
+   * beside it, since a retry no longer meets that wall.
+   */
+  signInWorks?: boolean
+  /**
+   * The failed read of whether that sign-in works again, on a surface with no
+   * other report of it (embed, popout): shown under the row's text.
+   */
+  signInCheckError?: Error | null
   /**
    * True on the newest `session_start_failed` row when the same session start
    * has already failed `SESSION_START_REPEAT_REFUSAL_AT` times in a row with
@@ -587,6 +599,8 @@ export const ErrorCard = memo(function ErrorCard({
   onPickModel,
   onOpenDefaultModel,
   onOpenSignIn,
+  signInWorks,
+  signInCheckError,
   unentitledElsewhere,
   featureRequestFormUrl,
   kiroCliMissing,
@@ -695,6 +709,21 @@ export const ErrorCard = memo(function ErrorCard({
       </div>
     )
   }
+  const resumeButton = onContinue && (
+    <button
+      type="button"
+      onClick={onContinue}
+      disabled={continuing}
+      className={`${ACTION_BTN} bg-accent text-accent-fg hover:bg-accent-hover`}
+      title={i18nT('pages.chat.errorCard.resume_hint')}
+      data-testid="error-card-continue"
+    >
+      {continuing
+        ? <Loader2 size={12} className="lucide-inline shrink-0 animate-spin" aria-hidden="true" />
+        : <RotateCw size={12} className="lucide-inline shrink-0" aria-hidden="true" />}
+      {i18nT('pages.chat.errorCard.resume')}
+    </button>
+  )
   if (onOpenSignIn) {
     // A signed-out agent process: the one action that ends it is signing in
     // again from Settings. The prose (the backend's own wording, which may
@@ -720,6 +749,7 @@ export const ErrorCard = memo(function ErrorCard({
             <KeyRound size={12} className="lucide-inline shrink-0" aria-hidden="true" />
             {i18nT('pages.chat.errorCard.sign_in')}
           </button>
+          {signInWorks && resumeButton}
         </div>
       </div>
     )
@@ -955,21 +985,6 @@ export const ErrorCard = memo(function ErrorCard({
       </div>
     )
   }
-  const resumeButton = onContinue && (
-    <button
-      type="button"
-      onClick={onContinue}
-      disabled={continuing}
-      className={`${ACTION_BTN} bg-accent text-accent-fg hover:bg-accent-hover`}
-      title={i18nT('pages.chat.errorCard.resume_hint')}
-      data-testid="error-card-continue"
-    >
-      {continuing
-        ? <Loader2 size={12} className="lucide-inline shrink-0 animate-spin" aria-hidden="true" />
-        : <RotateCw size={12} className="lucide-inline shrink-0" aria-hidden="true" />}
-      {i18nT('pages.chat.errorCard.resume')}
-    </button>
-  )
   if (onOpenTurnLimit || turnLimitSlot) {
     const secondaryBtn = `${ACTION_BTN} bg-transparent text-text ring-1 ring-inset ring-border hover:bg-bg-elevated`
     return (
@@ -1039,6 +1054,19 @@ export const ErrorCard = memo(function ErrorCard({
           // the next step there.
           <div className="text-[13px] leading-5 mt-1" data-testid="error-card-session-start-repeat-hint">
             {restartHint()}
+          </div>
+        )}
+        {signInCheckError && (
+          <div className="mt-1">
+            <ErrorNotice
+              title={signInCheckError.message ? i18nT('components.kasLogin.sign_in_status_unavailable') : undefined}
+              message={signInCheckError.message || i18nT('components.kasLogin.sign_in_status_unavailable')}
+              report={reportForError(signInCheckError)}
+              messagePlacement="below"
+              variant="inline"
+              noHandoffReason="This row says the agent's Kiro sign-in failed and no read has shown it working since; on KAS the Ask-the-agent chat runs as that same sign-in and would fail the same way."
+              testId="error-card-sign-in-check-failed"
+            />
           </div>
         )}
       </div>

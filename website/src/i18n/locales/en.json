@@ -7199,6 +7199,7 @@
         "retry_turn_stalled": "Turn stalled — resume to pick up where it stopped.",
         "retry_tool_stalled": "Tool appeared stalled — resume to pick up where it stopped.",
         "retry_backend_hiccup": "The agent hit a brief problem — resume to pick up where it stopped.",
+        "retry_kas_signed_in": "Signed in to Kiro — resume to send your message again.",
         "default_model": "Change default model",
         "default_model_hint": "Open Settings → Chat → Default Model. New sessions start on this value.",
         "turn_limit": "Change turn time limit",

@@ -12886,6 +12886,7 @@
         "retry_turn_stalled": "Tour bloqué — reprends là où ça s’est arrêté.",
         "retry_tool_stalled": "L’outil semble bloqué — reprends là où ça s’est arrêté.",
         "retry_backend_hiccup": "L’agent a rencontré un bref problème — reprends là où ça s’est arrêté.",
+        "retry_kas_signed_in": "Tu es connecté à Kiro — reprends pour renvoyer ton message.",
         "default_model": "Changer le modèle par défaut",
         "default_model_hint": "Ouvrir Paramètres → Chat → Modèle par défaut. Les nouvelles sessions démarrent avec cette valeur.",
         "turn_limit": "Modifier la durée maximale d’un tour",

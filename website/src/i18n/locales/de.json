@@ -12615,6 +12615,7 @@
         "retry_turn_stalled": "Zug hängt – wieder aufnehmen, um an der Unterbrechung weiterzumachen.",
         "retry_tool_stalled": "Werkzeug scheint zu hängen – wieder aufnehmen, um an der Unterbrechung weiterzumachen.",
         "retry_backend_hiccup": "Der Agent hatte ein kurzes Problem – wieder aufnehmen, um an der Unterbrechung weiterzumachen.",
+        "retry_kas_signed_in": "Bei Kiro angemeldet – wieder aufnehmen, um deine Nachricht erneut zu senden.",
         "default_model": "Standardmodell ändern",
         "default_model_hint": "Einstellungen → Chat → Standardmodell öffnen. Neue Sitzungen starten mit diesem Wert.",
         "turn_limit": "Zeitlimit pro Zug ändern",
