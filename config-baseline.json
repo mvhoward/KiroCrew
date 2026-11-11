@@ -51,6 +51,7 @@
         "sandbox_readonly_paths": [],
         "sandbox_readonly_exceptions": [],
         "apps_allow_third_party": false,
+        "apps_require_recorded_backend_spawn": false,
         "apps_trusted": [],
         "apps_trusted_local": [],
         "apps_trusted_repositories": {},
@@ -790,6 +791,20 @@
       "tags": [],
       "label": "Allow Third-Party Apps",
       "help": "Explicitly allow executable code from third-party (non-builtin) apps. Defaults to false. Only the JSON boolean true admits in-process Python hooks, backend processes, lifecycle/install scripts, and openCommand. App code can access the filesystem, network, and in-memory credentials; enable this only for apps you trust (CSE SEC-012). Prefer apps_trusted, which grants the same admission to ONE named app.",
+      "hasChildren": false,
+      "enumValues": null,
+      "defaultValue": false
+    },
+    {
+      "path": "agent.apps_require_recorded_backend_spawn",
+      "kind": "core",
+      "type": "boolean",
+      "required": false,
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
+      "label": "Require Recorded App Backend Spawn",
+      "help": "When true, the gateway adopts (and re-binds on recovery) a healthy app backend on the app's port only if one of the listener's owner pids is a live child this gateway spawned in this run, judged from its own memory and never from a file in the data home. Any other listener, such as an uninstall survivor or a backend an earlier gateway run spawned, is then refused until it is restarted through the gateway. Defaults to false: any healthy listener on the port is adopted.",
       "hasChildren": false,
       "enumValues": null,
       "defaultValue": false

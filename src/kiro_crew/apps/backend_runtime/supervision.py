@@ -16,6 +16,7 @@ import time
 from typing import Literal
 
 from kiro_crew.apps.backend_runtime import _FACADE
+from kiro_crew.apps.backend_runtime.pidfile import _adoption_attributed
 from kiro_crew.apps.backend_runtime.ports import _capture_adopted_owners
 from kiro_crew.apps.backend_runtime.probe import (
     HealthProbeOutcome,
@@ -38,6 +39,7 @@ from kiro_crew.apps.backend_runtime.tracking import (
     _restart_attempts,
 )
 from kiro_crew.apps.execution import app_execution_denied, third_party_ceiling_closed
+from kiro_crew.sel import sel
 
 logger = logging.getLogger(_FACADE)
 
@@ -138,12 +140,17 @@ def _health_check_loop(ap: AppProcess, health_path: str) -> AppProcess | None:
     return None
 
 
-def _rebind_adopted_owners(ap: AppProcess, health_path: str) -> bool:
+def _rebind_adopted_owners(
+    ap: AppProcess, health_path: str, *, require_attribution: bool = False
+) -> bool:
     """Re-capture an adopted backend's owning PIDs, or refuse to confirm ownership.
 
     Reuses the adoption-time consistency sandwich (:func:`_capture_adopted_owners`), so a
     responder that exits mid-capture cannot hand ownership to a bystander. Returns False
-    when ownership cannot be established, which the caller treats as "do not promote".
+    when ownership cannot be established, or, with *require_attribution*, when the owners
+    are not a recorded spawn (see :func:`_adoption_attributed`); the caller treats that as
+    "do not promote". The ceiling-revocation retry leaves it off so a revoked backend can
+    always be re-bound and stopped.
     """
     try:
         captured = _capture_adopted_owners(ap.app_name, ap.port, health_path)
@@ -164,6 +171,24 @@ def _rebind_adopted_owners(ap: AppProcess, health_path: str) -> bool:
         )
         return False
     pids, start_times = captured
+    if require_attribution and not _adoption_attributed(ap.app_name, pids, start_times):
+        try:
+            sel().log_api_access(
+                caller="gateway",
+                operation="app_backend_adopt",
+                outcome="refused_unrecorded",
+                resources=f"{ap.app_name} port={ap.port}",
+            )
+        except Exception as exc:  # noqa: BLE001 - an audit sink fault must not kill the watch
+            logger.debug("SEL audit failed for app %s rebind refusal: %s", ap.app_name, exc)
+        logger.warning(
+            "App %s: the listener on port %d (pids %s) is not a spawn this gateway "
+            "recorded and apps_require_recorded_backend_spawn is on — not re-binding it",
+            ap.app_name,
+            ap.port,
+            pids,
+        )
+        return False
     with _lock:
         if _processes.get(ap.app_name) is not ap:
             return False
@@ -510,7 +535,9 @@ def _watch_backend_health_sweeps(ap: AppProcess, health_path: str) -> None:
                 # the live replacement running while its files are mutated or removed.
                 # Refuse the promotion instead: unhealthy-but-serving is recoverable on
                 # the next sweep, a mis-bound owner set is not.
-                if ap.proc is None and not _rebind_adopted_owners(ap, health_path):
+                if ap.proc is None and not _rebind_adopted_owners(
+                    ap, health_path, require_attribution=True
+                ):
                     continue
                 _promote(ap)
             else:

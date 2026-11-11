@@ -4437,7 +4437,11 @@ are `_health_check_loop` (bounded startup poll) and `_watch_backend_health`
   already-reaped exit status without touching the app. An exited process cannot
   recover on its own, so one observation demotes it and the watch stops. An
   **adopted** backend has no `Popen` handle — it belongs to another supervisor —
-  and is judged by its health endpoint alone.
+  and is judged by its health endpoint alone. With `agent.apps_require_recorded_backend_spawn`
+  on (default off) a listener is adopted, and re-bound on recovery, only when one of its
+  owner pids is a live child this gateway spawned in this run, judged from the in-process
+  spawn table and never from `app_backends.pids.json` (a backend can write the data home);
+  any other listener is then refused until it is restarted through the gateway.
 - **An unexpected spawned-process exit is restarted, but never blindly.** After
   the dead generation's MCP scrub has landed, the supervisor reuses
   `start_app_backend` so its replacement follows the normal pidfile, health-gate,

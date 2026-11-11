@@ -19,6 +19,7 @@ from typing import Any
 
 from kiro_crew import platform_compat
 from kiro_crew.apps.backend_runtime import _FACADE
+from kiro_crew.apps.backend_runtime.tracking import _lock, _processes
 from kiro_crew.atomic_write import atomic_write
 from kiro_crew.config.loader import config_dir
 
@@ -162,6 +163,61 @@ def _record_app_pid(
     except Exception as exc:  # noqa: BLE001 — persistence must never break a spawn
         logger.debug("Could not record app pid for %s: %s", app_name, exc)
     return start_time
+
+
+def _spawn_is_recorded(app_name: str, pids: list[int], start_times: dict[int, str]) -> bool:
+    """Whether *pids* include a live child this gateway itself spawned for *app_name*.
+
+    Answered from the in-process spawn table (the memory behind
+    :func:`~kiro_crew.apps.backend_runtime.tracking.running_spawned_backend_pids`), never
+    from ``app_backends.pids.json``: that file sits in the data home a backend can write,
+    so a row there would vouch for any pid. The spawn root's start time recorded at
+    spawn must equal the one captured now; for a forking sandbox launcher the root's
+    direct children (the real server) are claimed too, matched on their live start time.
+    shortcut: a backend an earlier gateway generation spawned is not in the table and is
+    refused, as is a stopped one; widen only with a memory that outlives the record.
+    """
+    with _lock:
+        ap = _processes.get(app_name)
+        proc = ap.proc if ap is not None else None
+        root_start = ap.pid_start_time if ap is not None else None
+        forks = ap.forking_sandbox_launcher if ap is not None else False
+    if proc is None or proc.poll() is not None:
+        return False
+    claimed: dict[int, str | None] = {proc.pid: root_start}
+    if forks:
+        try:
+            claimed.update(
+                (c, _proc_start_time(c)) for c in platform_compat._proc_children(proc.pid)
+            )
+        except OSError:
+            pass  # the root stays claimed on its own
+    return any(
+        start is not None and pid in pids and start == start_times.get(pid)
+        for pid, start in claimed.items()
+    )
+
+
+def _adoption_attributed(app_name: str, pids: list[int], start_times: dict[int, str]) -> bool:
+    """Whether a healthy listener may be adopted (or re-bound) as *app_name*'s backend.
+
+    Any healthy listener is, unless ``agent.apps_require_recorded_backend_spawn`` is on;
+    then only a live child this gateway spawned (:func:`_spawn_is_recorded`). A setting
+    that cannot be read keeps main's behaviour (adopt) and logs one warning.
+    """
+    try:
+        from kiro_crew.config.loader import KiroCrewConfig
+
+        cfg = KiroCrewConfig.load()
+        if cfg._base_unreadable or cfg._overlay_unreadable or "agent" in cfg.degraded_sections:
+            raise ValueError("a config source is unreadable")
+        required = cfg.agent.apps_require_recorded_backend_spawn is True
+    except Exception as exc:  # noqa: BLE001 - an unreadable setting keeps the default
+        logger.warning(
+            "Could not read apps_require_recorded_backend_spawn (%s); adopting as main does", exc
+        )
+        required = False
+    return not required or _spawn_is_recorded(app_name, pids, start_times)
 
 
 def _forget_app_pid(app_name: str) -> None:

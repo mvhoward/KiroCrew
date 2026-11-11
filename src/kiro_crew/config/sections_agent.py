@@ -621,6 +621,19 @@ class AgentConfig:
             "apps_trusted, which grants the same admission to ONE named app.",
         ),
     )
+    apps_require_recorded_backend_spawn: bool = field(
+        default=False,
+        metadata=_meta(
+            "Require Recorded App Backend Spawn",
+            "When true, the gateway adopts (and re-binds on recovery) a healthy app "
+            "backend on the app's port only if one of the listener's owner pids is a "
+            "live child this gateway spawned in this run, judged from its own memory "
+            "and never from a file in the data home. Any other listener, such as an "
+            "uninstall survivor or a backend an earlier gateway run spawned, is then "
+            "refused until it is restarted through the gateway. Defaults to false: any "
+            "healthy listener on the port is adopted.",
+        ),
+    )
     apps_trusted: list[str] = field(
         default_factory=list,
         metadata=_meta(

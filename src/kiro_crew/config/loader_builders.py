@@ -825,6 +825,9 @@ def _agent_section_fields(agent_data: dict) -> AgentConfig:
             )
         ),
         apps_allow_third_party=section.read("apps_allow_third_party", _safe_bool),
+        apps_require_recorded_backend_spawn=section.read(
+            "apps_require_recorded_backend_spawn", _safe_bool
+        ),
         sandbox_readonly_paths=(
             [p for p in _ro_paths if isinstance(p, str) and p]
             if isinstance(_ro_paths := section.get("sandbox_readonly_paths"), list)
