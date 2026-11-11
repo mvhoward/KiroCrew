@@ -47,7 +47,7 @@ class TestInferKind:
             ("icon.svg", "svg"),
             ("data.json", "json"),
             ("notes.txt", "text"),
-            ("Board.kcanvas", "canvas"),
+            ("Board.kirocanvas", "canvas"),
             ("Makefile", "text"),  # no extension → text
             ("archive.tar.gz", "text"),  # unknown extension → text
             ("UPPER.MD", "markdown"),  # case-insensitive
