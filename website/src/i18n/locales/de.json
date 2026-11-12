@@ -21140,6 +21140,11 @@
         "could_not_read_webhook_status": "Webhook-Status konnte nicht gelesen werden — prüfe, ob das Gateway läuft"
       },
       "connectionsPanel": {
+        "sign_ins_title": "MCP-Anmeldungen",
+        "remember_sign_ins": "MCP-Anmeldungen über Sitzungen hinweg merken",
+        "remember_sign_ins_hint": "Aus: Jede neue Sitzung fragt dich erneut nach der Anmeldung bei deinen MCP-Servern. Ein: Eine Anmeldung wird verschlüsselt auf diesem Gateway gespeichert und jede Sitzung darauf verwendet sie wieder, auch die von Personen, mit denen du es über die geteilte Crew teilst. Gilt für das Kiro Agent-Backend.",
+        "remember_sign_ins_save_failed": "Die Einstellung für MCP-Anmeldungen konnte nicht gespeichert werden.",
+        "remember_sign_ins_load_failed": "Die Einstellung für MCP-Anmeldungen konnte nicht geladen werden.",
         "title": "OAuth-Apps für Verbindungen",
         "intro": "Manche Anbieter registrieren OAuth-Clients nicht automatisch. Folge für jeden unten der Einrichtungsanleitung, um eine App in der Anbieterkonsole zu registrieren, trage die hier gezeigte Redirect-URI exakt in diese App ein und gib dann Client ID und Secret der App ein. Über Umgebungsvariablen gesetzte Werte überschreiben die hier gespeicherten.",
         "loading": "Wird geladen…",

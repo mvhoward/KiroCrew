@@ -21652,6 +21652,11 @@
         "could_not_read_webhook_status": "Impossibile leggere lo stato del webhook — verifica che il gateway sia in esecuzione"
       },
       "connectionsPanel": {
+        "sign_ins_title": "Accessi MCP",
+        "remember_sign_ins": "Ricorda gli accessi MCP tra le sessioni",
+        "remember_sign_ins_hint": "Disattivato: ogni nuova sessione ti chiede di accedere di nuovo ai tuoi server MCP. Attivato: un accesso viene salvato cifrato su questo gateway e ogni sessione del gateway lo riutilizza, comprese quelle delle persone con cui condividi il gateway tramite la Crew condivisa. Si applica al backend Kiro Agent.",
+        "remember_sign_ins_save_failed": "Impossibile salvare l'impostazione degli accessi MCP.",
+        "remember_sign_ins_load_failed": "Impossibile caricare l'impostazione degli accessi MCP.",
         "title": "App OAuth per Connessioni",
         "intro": "Alcuni provider non registrano automaticamente un client OAuth. Per ciascuno qui sotto, segui la guida di configurazione per registrare un’app nella console del vendor, incolla in quell’app esattamente l’URI di redirect mostrato qui, poi inserisci client ID e secret dell’app. I valori impostati tramite variabili d’ambiente prevalgono su quanto salvato qui.",
         "loading": "Caricamento…",

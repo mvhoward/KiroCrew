@@ -20628,6 +20628,11 @@
         "could_not_read_webhook_status": "Webhook 상태를 읽을 수 없습니다 — 게이트웨이가 실행 중인지 확인하세요"
       },
       "connectionsPanel": {
+        "sign_ins_title": "MCP 로그인",
+        "remember_sign_ins": "세션 간 MCP 로그인 기억",
+        "remember_sign_ins_hint": "꺼짐: 새 세션마다 MCP 서버에 다시 로그인하라고 요청합니다. 켜짐: 로그인이 이 게이트웨이에 암호화되어 저장되고, 공유 Crew로 이 게이트웨이를 함께 쓰는 사람들의 세션을 포함해 이 게이트웨이의 모든 세션이 이를 다시 사용합니다. Kiro Agent 백엔드에 적용됩니다.",
+        "remember_sign_ins_save_failed": "MCP 로그인 설정을 저장하지 못했습니다.",
+        "remember_sign_ins_load_failed": "MCP 로그인 설정을 불러오지 못했습니다.",
         "title": "연결용 OAuth 앱",
         "intro": "일부 제공자는 OAuth 클라이언트 자동 등록을 거부합니다. 아래 각 제공자에 대해 설정 가이드를 따라 공급업체 콘솔에 앱을 등록하고, 여기 표시된 리디렉션 URI를 그대로 해당 앱에 붙여 넣은 뒤, 앱의 클라이언트 ID와 시크릿을 입력하세요. 환경 변수로 설정된 값은 여기에 저장된 값보다 우선합니다.",
         "loading": "불러오는 중…",

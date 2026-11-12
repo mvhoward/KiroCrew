@@ -10354,6 +10354,11 @@
         "credentials_applied_other": "{{count}} cookies applied"
       },
       "connectionsPanel": {
+        "sign_ins_title": "MCP sign-ins",
+        "remember_sign_ins": "Remember MCP sign-ins across sessions",
+        "remember_sign_ins_hint": "Off: each new session asks you to sign in to your MCP servers again. On: a sign-in is saved encrypted on this gateway and every session on it reuses it, including those of people you share it with through Shared Crew. Applies to the Kiro Agent backend.",
+        "remember_sign_ins_save_failed": "Could not save the MCP sign-in setting.",
+        "remember_sign_ins_load_failed": "Could not load the MCP sign-in setting.",
         "title": "OAuth apps for Connections",
         "intro": "Some providers refuse to register an OAuth client automatically. For each one below, follow its setup guide to register an app in the vendor console, paste the exact redirect URI shown here into that app, then enter the app's client ID and secret. Values set through environment variables override what is saved here.",
         "loading": "Loading…",
