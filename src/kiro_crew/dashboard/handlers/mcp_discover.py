@@ -517,6 +517,17 @@ async def _install_from_official(request: web.Request, server_id: str) -> web.Re
                     resources=f"official:{name} store unreadable",
                 )
                 return _mcp_config_corrupt("the Kiro Crew mcp.json")
+            if action == "ambiguous":
+                # Two store keys alias to this name and nothing was written:
+                # the same refusal the toggle answers, not an install.
+                sel().log_api_access(
+                    caller="dashboard",
+                    operation="mcp_discover_install",
+                    outcome="denied",
+                    source="dashboard",
+                    resources=f"official:{name} ambiguous",
+                )
+                return web.json_response({"error": "name already in use"}, status=409)
         else:
             # Identical spec already present — a reinstall is a pure no-op:
             # the user's env values AND enabled/disabled state survive.

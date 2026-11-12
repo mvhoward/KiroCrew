@@ -180,6 +180,20 @@ def _set_kirocrew_entry(
     existing = existing if isinstance(existing, dict) else None
     if existing_only and existing is None:
         return "absent"
+    # A stub entry (``{"disabled": true}``, ``{"disabledTools": [...]}``, ``{}``)
+    # has no command or url, so the spec lookup cannot see it and a caller with a
+    # spec (a registry install) means to put one there. The spec owns how the
+    # server is launched (the plan the user consented to); the stub keeps only its
+    # own overrides. Otherwise the noop below kept the stub and the install
+    # answered ok for a server that could never launch.
+    filled = False
+    if existing is not None and spec and not (existing.get("command") or existing.get("url")):
+        for k, v in spec.items():
+            if k in ("command", "args", "url", "type"):
+                existing[k] = v
+            elif k != "disabled":
+                existing.setdefault(k, v)
+        filled = True
 
     if enabled:
         if existing is None and spec is None:
@@ -195,6 +209,8 @@ def _set_kirocrew_entry(
             if mcp_entry_is_muted(existing):
                 existing.pop("disabled", None)
                 action = "enabled"
+            elif filled:
+                action = "added"
             else:
                 return "noop"
     else:
@@ -204,7 +220,7 @@ def _set_kirocrew_entry(
             entry["disabled"] = True
             servers[name] = entry
             action = "disabled"
-        elif existing.get("disabled") is True:
+        elif existing.get("disabled") is True and not filled:
             # The literal, not the predicate: a non-boolean already mutes the
             # entry, but the write below repairs it into the boolean the schema
             # wants, so only a real ``true`` is a no-op.

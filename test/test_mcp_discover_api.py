@@ -493,6 +493,38 @@ class TestDiscoverInstall:
         finally:
             await client.close()
 
+    @pytest.mark.parametrize(
+        "stub",
+        [{"disabled": True}, {"disabledTools": ["x"]}, {}, {"command": "", "args": ["old"]}],
+        ids=["off", "tools", "empty", "stale-invocation"],
+    )
+    async def test_official_install_over_a_stub_entry_writes_the_spec(
+        self, sandbox, fake_sel, reset_registry, stub
+    ):
+        """A stub left by a scope-off or tool toggle has no command, so the spec
+        lookup cannot see it; the install must fill it in, not answer ok over it."""
+        sandbox.kirocrew_json.write_text(
+            json.dumps({"mcpServers": {"weather": dict(stub)}}), encoding="utf-8"
+        )
+        client = await _client(FakeOfficialProvider())
+        try:
+            resp = await client.post(
+                "/api/mcp/discover/install",
+                json={"provider": "official", "id": _WEATHER_ID},
+            )
+            assert resp.status == 200
+            entry = json.loads(sandbox.kirocrew_json.read_text(encoding="utf-8"))["mcpServers"][
+                "weather"
+            ]
+            assert entry["command"] == "npx"
+            assert entry["args"] == ["-y", "@acme/weather-mcp@1.2.3"]
+            assert entry["disabled"] is True
+            for k, v in stub.items():
+                if k not in ("disabled", "command", "args"):
+                    assert entry[k] == v, "the stub's own overrides are kept"
+        finally:
+            await client.close()
+
     async def test_install_reports_a_declined_rebuild(self, sandbox, fake_sel, reset_registry):
         """The shared-home guard refused the write: saved, but not live yet."""
         sandbox.rebuild.side_effect = lambda **_: Path("/dev/null")
