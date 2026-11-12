@@ -795,7 +795,9 @@ def _url_payload_command(n: int) -> str:
 #: Raised by 20, from 35,804, to 35,824, for ``StreamRedactor.release_sentence_end`` in
 #: ``text_redaction``: a withheld run that is one plain word ending a sentence can be
 #: committed before the next chunk arrives. No pattern, pass or commit boundary moved.
-_PACKAGE_LINE_BUDGET = 35_824
+#: Raised by 17, from 35,824, for ``_KIRO_PERMISSION_RULE_LEAVES`` in ``paths_lists``:
+#: kiro-cli's permission rule files on the file-tool write fence. It only adds refusals.
+_PACKAGE_LINE_BUDGET = 35_841
 
 #: Ceiling on any ONE file in the package. This is what the bound is really for --
 #: a package total says nothing about a single file growing back into a second
