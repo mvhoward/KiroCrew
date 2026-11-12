@@ -3373,6 +3373,30 @@ rounds, and for candidates past five to be merged by shared root cause rather
 than dropped; the calibration note says "No findings." is the expected output for
 a typical PR.
 
+### Ownership mandate, for authors and reviewers
+
+Authors and reviewers work from one ownership mandate. Authors own the code
+long-term. They fix causes, consolidate duplicate logic and drive the change to
+green. The author copy is the `## Own the codebase` section in the root
+`AGENTS.md`, and there is no other. The reviewer copy is the `OWN THE CODEBASE,
+IN BOTH DIRECTIONS` block. It gives a reviewer the author's rule: a
+behavior-preserving related cleanup is one the author was told to make, and a
+wrapper around a defect, a duplicate of existing logic or a deferred defect is
+reported by naming the cause or the existing code. Each of those is a finding
+only under that lane's own bar, so the block changes nothing a lane blocks on.
+The block sits right after the deployment-neutral framing in the GPT, Opus and
+First Principles lanes, and near the top of `security-scope.md`. The two Design
+Review workflows read `AGENTS.md` instead of carrying it: each inlines its
+prompt as one expression-bearing string, and the block would take that string
+past GitHub's 21000-character cap. Neither copy can widen a security fence or
+override `AGENTS.md`'s security invariants. The author copy also yields to every
+other `AGENTS.md` rule, to the skill or agent charter being followed (the
+`kirocrew-dashboard-author` Bot's "say so and stop" included) and to an explicit
+stop from the user. `test/test_ownership_mandate.py` keeps the reviewer copy
+byte-identical across its lanes, after dedent, and keeps it out of the Design
+Review prompts. The UX, GUI-user-test and fix-loop-analysis lanes do not judge
+code structure, so they do not carry the block.
+
 ### Asymmetric multi-pass is intentional
 
 BOTH line reviewers run **two real invocations**: a discovery pass that

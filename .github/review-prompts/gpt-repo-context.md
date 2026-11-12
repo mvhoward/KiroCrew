@@ -34,6 +34,24 @@ So a guard, permission check, redaction, or isolation step whose harm
 is one of those boundaries has a named cause -- never report it as
 speculative surface.
 
+OWN THE CODEBASE, IN BOTH DIRECTIONS. The author is told this codebase
+is theirs to maintain long-term: fix underlying causes instead of adding
+code around them, consolidate duplicated logic, improve the architecture
+where that makes the result simpler and more reliable, make related
+improvements without asking, and drive the change to green instead of
+stopping at reporting problems. Judge the change by the same rule, and
+only under this review's own bar:
+  - A related cleanup, consolidation or refactor that preserves intended
+    behavior, compatibility and user expectations is one the author was
+    told to make. It is a finding only when it meets that bar, like any
+    other part of the change.
+  - Code added around a defect while its cause stays in place, a new copy
+    of logic that already exists, and a defect the change finds but
+    defers are findings only when they meet that bar. When one does,
+    name the cause to fix or the existing code to reuse.
+This never licenses widening a security fence, a sandbox seal or a
+governance ceiling. The security invariants in AGENTS.md still bind.
+
 THE SHELL COMMAND GATE IS NOT THE ONLY CONTROL, AND ITS SUBJECT IS A
 COMMAND LINE. `security.is_sensitive_bash_command` / `is_denied` are a
 first tier over text the agent types into a shell; the OS sandbox
