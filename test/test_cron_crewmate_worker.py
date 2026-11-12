@@ -163,6 +163,23 @@ async def test_a_crewmate_whose_own_file_was_deleted_fails_closed_on_its_worker(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("file_present", [True, False])
+async def test_a_crewmate_shadowed_by_a_user_level_template_runs_its_cron_there(
+    monkeypatch, file_present
+):
+    """A Bot on record whose name a user-level template also declares. Its chats
+    run on that template (``member_chat_agent``), so its cron turn keeps the same
+    member route instead of the worker, which refuses a shadowed file."""
+    call, captured = await _fire(
+        monkeypatch, owns_file=True, file_present=file_present, user_spec="alpha.json"
+    )
+
+    assert call.kwargs["agent"] != MATE_WORKER_AGENT
+    assert call.kwargs["crew_agent"] == "alpha"
+    assert read_session_execution("cron:hourly") == captured
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("user_spec", ["alpha.json", "someapp--alpha.json"])
 async def test_an_installed_agent_named_like_its_member_keeps_its_cron(monkeypatch, user_spec):
     """``kiro_agent`` == alias with no crewmate file is a crewmate only when no other
