@@ -579,19 +579,31 @@ def read_page(session_id: str, start: int, end: int) -> dict[str, Any]:
     # ``handle.last_seq`` is this instance's own cached figure -- the store's
     # docstring says it is authoritative only for its OWN appends -- and a reader
     # handle never appends, so a writer that grows the file after this handle
-    # opened is invisible to it. The iteration below reads the file live and walks
-    # the whole tail from ``start``, discarding what is past ``end`` rather than
-    # never seeing it, so the true tail is observable here for free. Deriving
+    # opened is invisible to it. The iteration below reads the file live from
+    # ``start`` and, once past ``end``, takes the newest seq from the file's last
+    # record, so the true tail is observable here. Deriving
     # ``next_from`` from the cached figure instead would let a page return rows up
     # to ``end`` and still report that nothing follows, and a client that believes
     # it stops paging with entries left unread.
     observed_last = handle.last_seq
     entries: list[Any] = []
+    asked_tail = False
     for entry in handle.iter_from(start, strict_seq=False):
         if entry.seq > observed_last:
             observed_last = entry.seq
         if entry.seq <= end:
             entries.append(entry)
+            continue
+        if asked_tail:
+            continue
+        # Past *end*: the rest of the walk only finds the newest seq, which the
+        # file's last record states in one bounded read. Walked on when the tail is
+        # not settled, as before.
+        asked_tail = True
+        tail = handle.tail_records(1)
+        if tail:
+            observed_last = max(observed_last, tail[-1][0].seq)
+            break
     resolutions: dict[tuple[Any, ...], dict[str, Any]] = {}
     unresolved = 0
     rows: list[dict[str, Any]] = []
