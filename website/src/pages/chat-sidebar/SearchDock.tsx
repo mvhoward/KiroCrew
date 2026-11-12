@@ -186,13 +186,13 @@ export function renderSearchDock(shell: SidebarScope): { field: React.ReactNode;
   const { activeFilters, activeModelKeys, activeModelRows, activeTagIds, activeTagNames, autoTitleError,
     availableLanes, boardLaneActive, changeRecentUnit, clearHiddenFilters, clearModelFilter, clearTagFilter,
     closeRefused, columnsError, columnsFailed, commitRecentAmount, conductorView, connected, cycleLane, dismissSortError, dispatch,
-    filterCounts, filterHiddenFolders, filterSortOpen, filtersPaused, flatLaneActive, folderActionError, groupByKind, toggleGroupByKind,
+    filterCounts, filterHiddenFolders, filterSortOpen, filtersPaused, pausedFilters, flatLaneActive, folderActionError, groupByKind, toggleGroupByKind,
     folderFilterRows, folderOfflineNotice, folderReorderHint, folderReorderHintRef, folderRowsDrawn, folderSortMode,
     folderSortMut, folderSortRead, folders, foldersError, foldersFailed, foldersShelved,
     hasRemoteExecutedRow, hiddenFilters, hiddenFolderCount, instanceSessions, isMobile, lane,
     laneSwitchLabel, listNarrowed, manualOrderError, modelFilterInverted, modelFilterRows, newChatError, nextLane, pinnedOrderError, prStatusRefreshError,
     recentAmountDraft, recentUnitDraft, recentWindowMs, refetchColumns, refetchFolders, remoteSessionsError,
-    renameError, seedError, seedStateLanesMutation, selectRecentPreset, setAllFiltersPaused,
+    renameError, seedError, seedStateLanesMutation, selectRecentPreset, setAllFiltersPaused, toggleFilterPaused,
     setAutoTitleError, setFilterSortOpen, setFolderActionError, setFolderOfflineNotice, setManualOrderError, setModelFilterExcluded, setNewChatError,
     setPinnedOrderError, setPrStatusRefreshError, setRecentAmountDraft, setRenameError, setSeedError, setSlotFilter, setSortKey, setStaleCollapseMs,
     setToggleSaveFailed, showAllFolders, slotFilter, sortError, sortKey, staleCollapseMs, tagFilterRows, toggleFilter,
@@ -513,13 +513,10 @@ export function renderSearchDock(shell: SidebarScope): { field: React.ReactNode;
                     </Fragment>
                   )
                 })}
-                {/* Lift every active status filter at once, for a look at the
-                    whole list without losing the filter setup, then put them
-                    back. A menu row, not a third control in the chip row:
-                    AUTOSDE max-two-buttons-per-row grandfathers that row but
-                    forbids growing it, and the chip click keeps its one meaning
-                    (clear this filter). Hidden with no active filter, when
-                    there is nothing to pause. */}
+                {/* Lift every active status filter at once; a chip pauses just
+                    itself. A menu row, not another chip-row control, per AUTOSDE
+                    max-two-buttons-per-row. Reads "Resume all" only once every
+                    filter is paused. Hidden with no active filter. */}
                 {activeFilters.size > 0 && (
                   <DropdownMenuItem
                     data-testid="filter-pause-all"
@@ -1092,7 +1089,13 @@ export function renderSearchDock(shell: SidebarScope): { field: React.ReactNode;
               label={`${filterLabel}${slotCount > 0 ? ` (${slotCount})` : ''}`}
               color="var(--accent)"
               gradient
-              paused={filtersPaused}
+              paused={pausedFilters.has('crew')}
+              pauseLabel={i18nT('pages.chatSidebar.pause_named_filter', { filter: filterLabel })}
+              resumeLabel={i18nT('pages.chatSidebar.resume_named_filter', { filter: filterLabel })}
+              pausedText={i18nT('pages.chatSidebar.filter_paused_suffix')}
+              pauseHint={i18nT('pages.chatSidebar.filter_chip_pause_hint')}
+              resumeHint={i18nT('pages.chatSidebar.filter_chip_resume_hint')}
+              onTogglePause={() => toggleFilterPaused('crew')}
               clearLabel={i18nT('pages.chatSidebar.clear_named_filter', { filter: filterLabel })}
               onClear={() => toggleFilter('crew')}
             />
@@ -1115,7 +1118,13 @@ export function renderSearchDock(shell: SidebarScope): { field: React.ReactNode;
                 testId={`filter-chip-${filterDef.key}`}
                 label={`${filterLabel}${filterDef.key === 'recent' ? ` · ${formatRecentWindow(recentWindowMs)}` : ''}${slotCount > 0 ? ` (${slotCount})` : ''}`}
                 color={filterDef.color}
-                paused={filtersPaused}
+                paused={pausedFilters.has(filterDef.key)}
+                pauseLabel={i18nT('pages.chatSidebar.pause_named_filter', { filter: filterLabel })}
+                resumeLabel={i18nT('pages.chatSidebar.resume_named_filter', { filter: filterLabel })}
+                pausedText={i18nT('pages.chatSidebar.filter_paused_suffix')}
+                pauseHint={i18nT('pages.chatSidebar.filter_chip_pause_hint')}
+                resumeHint={i18nT('pages.chatSidebar.filter_chip_resume_hint')}
+                onTogglePause={() => toggleFilterPaused(filterDef.key)}
                 clearLabel={clearLabel}
                 onClear={() => toggleFilter(filterDef.key)}
               />
