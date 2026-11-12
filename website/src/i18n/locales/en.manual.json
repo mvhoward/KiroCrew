@@ -3240,7 +3240,9 @@
         "chat_stopped_refused_body": "The model declined to answer and the chat stopped. Open the chat to see why.",
         "chat_stopped_stalled_body": "The chat stalled and could not recover. Open the chat to start a new one.",
         "folder_agent_label_title": "Check a folder's Default agent",
-        "folder_agent_label_body": "These folders' Default agent has a bot's name, but new chats there do not run on that bot: {{folders}}. To use the bot, pick it as the Default agent in the folder's settings."
+        "folder_agent_label_body": "These folders' Default agent has a bot's name, but new chats there do not run on that bot: {{folders}}. To use the bot, pick it as the Default agent in the folder's settings.",
+        "mcp_share_paused_title": "A shared MCP server is paused",
+        "mcp_share_paused_body": "Paused: {{names}}. Review and approve the update to share again."
       },
       "notificationBanner": {
         "dismiss_notification": "Dismiss notification",

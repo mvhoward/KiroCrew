@@ -8671,7 +8671,9 @@
         "chat_stopped_refused_body": "Le modèle a refusé de répondre et la discussion s’est arrêtée. Ouvre la discussion pour voir pourquoi.",
         "chat_stopped_stalled_body": "La discussion s’est bloquée et n’a pas pu reprendre. Ouvre la discussion pour en démarrer une nouvelle.",
         "folder_agent_label_title": "Vérifie l’agent par défaut d’un dossier",
-        "folder_agent_label_body": "L’agent par défaut de ces dossiers porte le nom d’un Bot, mais les nouvelles discussions qui s’y trouvent ne s’exécutent pas sur ce Bot : {{folders}}. Pour utiliser le Bot, choisis-le comme agent par défaut dans les paramètres du dossier."
+        "folder_agent_label_body": "L’agent par défaut de ces dossiers porte le nom d’un Bot, mais les nouvelles discussions qui s’y trouvent ne s’exécutent pas sur ce Bot : {{folders}}. Pour utiliser le Bot, choisis-le comme agent par défaut dans les paramètres du dossier.",
+        "mcp_share_paused_title": "Un serveur MCP partagé est en pause",
+        "mcp_share_paused_body": "En pause : {{names}}. Vérifie et approuve la mise à jour pour le partager à nouveau."
       },
       "notificationBanner": {
         "dismiss_notification": "Ignorer la notification",

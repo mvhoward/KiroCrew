@@ -80,6 +80,18 @@ def _schedule_mcp_launch_approval_persist(
                 "mcp launch approvals: could not persist the approval store",
                 exc_info=True,
             )
+            return
+        # The store now holds this start's refusals: tell the owner once about a
+        # share that was approved and is paused, since no chat says so.
+        if approvals.refused and self.dashboard_state is not None:
+            try:
+                from kiro_crew.notifications import mcp_share_paused_note
+
+                await mcp_share_paused_note.publish(self.dashboard_state)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.warning("mcp launch approvals: paused-share note failed", exc_info=True)
 
     task = asyncio.create_task(_persist(), name="mcp-launch-approval-persist")
     self._background_tasks.add(task)

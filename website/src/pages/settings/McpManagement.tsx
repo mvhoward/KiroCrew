@@ -1,4 +1,5 @@
-import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Check, ExternalLink, ListChecks, RefreshCw, Server as ServerIcon, Share2 } from 'lucide-react'
 import {
@@ -74,6 +75,9 @@ import {
 import { useMcpHandoffHint, useMcpHandoffWouldLoseEdits } from '../connections/mcpStagedEditsContext'
 import { isPermanentRefusal } from '../overview/McpShareRefusedNotice'
 import { retryPolicy } from '../../api/queryClient'
+
+/** The query param that asks the Sharing view to open its Review dialog. */
+export const REVIEW_PARAM = 'review'
 
 /**
  * MCP Management, top to bottom: the hero (title, Learn more, the page-wide
@@ -633,6 +637,21 @@ export function McpManagement({
     setReviewItems(waiting.map(server => ({ server, refusal: refused[server.name] })))
   }
   const closeReview = useCallback(() => setReviewItems(null), [])
+  // `?review=1` is the paused-share bell note's link: open the dialog once the
+  // waiting servers are read, then drop the param so a reload does not reopen it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const reviewAsked = searchParams.get(REVIEW_PARAM) === '1'
+  const waitingCount = waiting.length
+  useEffect(() => {
+    if (!reviewAsked || waitingCount === 0) return
+    openReview()
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.delete(REVIEW_PARAM)
+      return next
+    }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openReview reads the same render's `waiting`
+  }, [reviewAsked, waitingCount])
   // The table button's own write and checks: one stub POST pinned to the
   // shown `expected_launch`. A launch that moved is refused by the endpoint,
   // and the refusal comes back as the error line the dialog shows in that
