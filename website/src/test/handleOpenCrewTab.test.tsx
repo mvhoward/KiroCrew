@@ -132,3 +132,21 @@ describe('handleOpenCrewTab (Crew Mode dispatch-notice reveal)', () => {
     expect(closeSearch).toHaveBeenCalledTimes(1)
   })
 })
+
+// The folder twin of handleFileOpen's split-pane override (#9921, #35014),
+// pinned here because this file already builds the controller.
+describe('handleFolderOpen (split-pane slot override)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('stamps the folder tab with the pane slot it is given', () => {
+    const { result } = renderHook(() => useController('active-chat'), { wrapper })
+    result.current.handleFolderOpen('/repo/evidence/', { slot: 'pane-chat' })
+    expect(result.current.tabsCtl.openFolder).toHaveBeenCalledWith('/repo/evidence/', 'pane-chat')
+  })
+
+  it('without an override stamps the active slot', () => {
+    const { result } = renderHook(() => useController('active-chat'), { wrapper })
+    result.current.handleFolderOpen('/repo/evidence/')
+    expect(result.current.tabsCtl.openFolder).toHaveBeenCalledWith('/repo/evidence/', 'active-chat')
+  })
+})

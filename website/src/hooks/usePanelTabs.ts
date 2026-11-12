@@ -1229,8 +1229,12 @@ export function usePanelTabs(
    *  directory and a same-named file never collide on id, and so re-opening the
    *  same directory focuses the existing tab instead of stacking duplicates. */
   const openFolder = useCallback((path: string, slot: string | null = null) => {
-    upsert({ id: `folder:${path}`, kind: 'folder', title: basename(path), path, slot })
-  }, [upsert])
+    // Same slot/bucket routing as openFile (see its note).
+    const target = slot !== null ? bucketKey(slot) : key
+    mutateSlot(target, b => upsertInBucket(b, {
+      id: `folder:${path}`, kind: 'folder', title: basename(path), path, slot,
+    }), target === key ? defaultLeadingId : null, { choice: true })
+  }, [key, defaultLeadingId])
 
   /** Open (or refocus) the app tab hosting one MCP App render. Keyed by
    *  tool-call id, so a re-render of the same app reuses its tab instead of

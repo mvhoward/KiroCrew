@@ -602,9 +602,10 @@ export function useChatPageResourcesController({
    *  The folder twin of handleFileOpen, and deliberately much thinner: there is
    *  no content to prefetch (FolderPanel owns its own ['browse-files', path]
    *  query). Only reachable for paths the backend already
-   *  confirmed are directories, so there is no not-found branch to handle. */
-  const handleFolderOpen = useCallback((dirPath: string) => {
-    tabsCtl.openFolder(dirPath, activeSlotRef.current ?? null)
+   *  confirmed are directories, so there is no not-found branch to handle.
+   *  `opts.slot` is the same split-pane override openFile takes (#9921). */
+  const handleFolderOpen = useCallback((dirPath: string, opts?: { slot?: string | null }) => {
+    tabsCtl.openFolder(dirPath, opts?.slot !== undefined ? opts.slot : (activeSlotRef.current ?? null))
     dispatch(openActivityPanel())
     search.close()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- same as handleFileOpen above: `search.close` is a useCallback([]) and the enclosing `search` object is a fresh literal every render, so listing it would churn the onFolderOpen prop on every transcript row
