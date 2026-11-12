@@ -1,12 +1,12 @@
 ---
 title: Bounded-time restore for large sessions - tail window for fully read tabs, focus-first order, one walk for a slot's folds, and a CI fixture at the threshold
-status: draft
+status: accepted
 author: kirocrew agent session, directed by chenmingwei23
 created: 2026-11-12
 last-audited: 2026-11-12
-audited-at: 029b6db029
+audited-at: 0feaa8be90
 doc-pr: 35916
-implementation-prs: []
+implementation-prs: [35960, 36141]
 tracking-issues: [35875]
 supersedes: []
 superseded-by: []
@@ -14,7 +14,7 @@ superseded-by: []
 
 # RFC: Bounded-time restore for large sessions
 
-Status: draft. This is part B of [#35875](https://github.com/kirodotdev/KiroCrew/issues/35875). Part A (readiness in the composer) is a separate document. Main-side references were read at `029b6db029`. The document changes no code.
+Status: accepted. Accepted 2026-11-12: approved in review by KiroCrewCaptain on #35916; the repository owner's lead accepted it as the plan. 1.2 and 1.1 are behaviour changes approved by this acceptance. This is part B of [#35875](https://github.com/kirodotdev/KiroCrew/issues/35875). Part A (readiness in the composer) is a separate document. Main-side references were read at `029b6db029`. The document changes no code.
 
 ## Summary
 
