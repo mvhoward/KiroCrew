@@ -10,6 +10,7 @@ Pinned here:
   marker only its queue arm writes, so a person's typed message, another
   session's entry and a requeued steer are never touched;
 * a move EARLIER may pass only the caller's own entries;
+* a listing shows text only for the caller's own entries;
 * there is no ``cancel``: a queued send can already be a recorded hand-back;
 * a move takes the queue card's path: it broadcasts the card's frame,
   never suspends, and runs no save of its own;
@@ -116,14 +117,30 @@ def test_list_marks_who_queued_each_entry(tmp_path):
     assert out["entries"][0]["excerpt"] == "rerun the snapshot tests"
 
 
+def test_list_shows_text_only_for_the_callers_own_entries(tmp_path):
+    """Mutation guard: an excerpt on every row put a person's queued words in front of an agent."""
+    state, caller, _peer_slot, target = _setup(tmp_path)
+    _person(target, "a person's private note")
+    _peer(state, target, "another conductor's private note")
+    _mine(state, target, "mine")
+    out = _call(state, caller)
+    assert [sorted(e) for e in out["entries"]] == [
+        ["from", "id", "position"],
+        ["from", "id", "position"],
+        ["excerpt", "from", "id", "position"],
+    ]
+    assert "private note" not in json.dumps(out)
+
+
 def test_list_redacts_and_cuts_every_excerpt(tmp_path):
-    """A person's words reach an agent reader redacted, like any non-human surface."""
+    """The caller's own words reach it redacted, like any non-human surface."""
     state, caller, _peer_slot, target = _setup(tmp_path)
     secret = "AKIA" + "ABCDEFGHIJKLMNOP"
-    _person(target, f"key {secret}")
+    _mine(state, target, f"key {secret}")
     _mine(state, target, "x" * 5000)
     out = _call(state, caller)
     assert secret not in json.dumps(out)
+    assert out["entries"][0]["excerpt"].startswith("key ")
     assert out["entries"][1]["excerpt"].endswith("…[truncated]")
 
 
@@ -145,7 +162,7 @@ def test_an_oversized_restored_id_is_cut_to_the_argument_cap(tmp_path):
     entry_id = out["entries"][0]["id"]
     assert entry_id == "x" * (scq.QUEUE_ENTRY_ID_MAX_CHARS - 1) + "…"
     assert len(entry_id) == scq.QUEUE_ENTRY_ID_MAX_CHARS
-    assert set(out["entries"][0]) == {"id", "position", "from", "excerpt"}
+    assert set(out["entries"][0]) == {"id", "position", "from"}
 
 
 def test_a_stamp_from_a_previous_occupant_of_the_key_is_not_yours(tmp_path):
@@ -585,6 +602,23 @@ def test_a_malformed_restored_queue_id_does_not_break_the_reorder():
     assert [m["content"] for m in messages] == ["hi", "a", "b", "bad", "badcls"]
 
 
+def test_a_cron_twin_row_names_one_id_in_both_spellings(tmp_path):
+    """Remove matches either spelling but the reorder reads ``meta.queueId`` first, so
+    the one writer of both must write the same id in each."""
+    from kiro_crew.dashboard.chat_utils_injected_rows import (
+        _queued_row_id,
+        _remove_queued_by_id,
+    )
+    from kiro_crew.dashboard.cron_inject import queue_cron_notification
+
+    slot = _make_state(tmp_path).get_or_create_slot("chat-2")
+    qid = queue_cron_notification(slot, "wrapped", "nightly")
+    (row,) = [m for m in slot.messages if m.get("role") == "queued"]
+    assert json.loads(row["cls"])["queue_id"] == qid
+    assert _queued_row_id(row) == qid
+    assert _remove_queued_by_id(slot.messages, qid)
+
+
 def test_an_unknown_action_is_refused(tmp_path):
     state, caller, _peer_slot, _target = _setup(tmp_path)
     with pytest.raises(sc.SessionControlError) as exc:
@@ -676,12 +710,10 @@ def test_the_route_is_a_strict_internal_path():
 def test_the_tool_posts_the_verified_key_to_the_queue_route():
     body = {
         "target": "chat-2",
-        "title": "w",
-        "running": True,
         "count": 1,
         "moved": "q1",
         "position": 0,
-        "entries": [{"id": "q2", "position": 0, "from": "person", "excerpt": "hi"}],
+        "entries": [{"id": "q2", "position": 0, "from": "person"}],
     }
     dash = InMemoryDashboardClient({"POST /api/session-control/queue": body})
     out = TABLE.call(
@@ -694,7 +726,7 @@ def test_the_tool_posts_the_verified_key_to_the_queue_route():
     assert post.body == {"target": "chat-2", "action": "move", "entry": "q1", "position": 0}
     assert post.session_key == _VERIFIED
     assert "Moved queued entry q1 to position 0." in out
-    assert '0  q2  person  "hi"' in out
+    assert out.split("\n")[1:] == ["\U0001f4e5 `chat-2`, 1 queued", "0  q2  person"]
 
 
 def test_the_tool_refuses_an_unverifiable_caller():
@@ -737,34 +769,34 @@ def test_render_keeps_each_entry_on_one_line_whatever_its_breaks():
         {
             "target": "t",
             "count": 1,
-            "entries": [{"id": "q\r1", "position": 0, "from": "person", "excerpt": forged}],
+            "entries": [{"id": "q\r1", "position": 0, "from": "yours", "excerpt": forged}],
         }
     )
     rows = out.split("\n")
     # One header plus exactly one entry row, however the text breaks.
     assert len(rows) == 2
     assert "\r" not in out and "\u2028" not in out
-    assert rows[1].startswith("0  q 1  person")
+    assert rows[1].startswith("0  q 1  yours")
 
 
-def test_render_keeps_the_header_on_one_line_whatever_the_title_holds():
-    """Mutation guard: a CR or newline in an editable title forged listing rows."""
+def test_render_keeps_the_header_on_one_line_whatever_the_target_holds():
+    """Mutation guard: a CR or newline in the target forged listing rows."""
     out = _render_session_queue(
         {
             "target": "t\r\n0  q  yours",
-            "title": 'real\n0  forged  yours   "x"\u2028more',
             "count": 0,
         }
     )
     rows = out.split("\n")
     assert len(rows) == 2  # the header and the empty-queue line
-    assert "\r" not in out and "\u2028" not in out
+    assert "\r" not in out
     assert rows[1] == "The queue is empty."
 
 
-def test_a_listed_title_is_bounded(tmp_path):
+def test_the_listing_carries_no_title_or_running_state(tmp_path):
+    """``session_summary`` reaches the same targets and says whether one is working."""
     state, caller, _peer_slot, target = _setup(tmp_path)
-    target.title = "t" * 5000
+    target.title = "a title"
     target._titled = True
     out = _call(state, caller)
-    assert len(out["title"]) == sc.MAX_SESSION_STATUS_TITLE_CHARS
+    assert "title" not in out and "running" not in out

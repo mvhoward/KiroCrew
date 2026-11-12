@@ -1129,13 +1129,15 @@ def _session_tools() -> tuple[Tool, ...]:
             name="session_queue",
             description=(
                 "See and reorder the messages waiting in the queue of a session YOU manage "
-                "(one you created, or one handed to you with session_handoff). "
+                "(one you created, one handed to you with session_handoff, or, with "
+                "agent.session_manager_chain on, one managed by a session you manage). "
                 "session_send to a busy session queues the message (started: false); this is "
                 "how you see where it sits and reorder your entries by priority. A correction to "
                 "an earlier message should stay AFTER it, so the target reads it last. "
                 "action=list returns the first 50 queued entries in run order (the "
                 "rest are counted in `omitted`, not listed), each with its id, its position (0 "
-                "runs next), a redacted excerpt and whether YOU queued it. action=move puts one "
+                "runs next) and whether YOU queued it; only your own entries carry a redacted "
+                "excerpt. action=move puts one "
                 "entry at `position`; it applies ONLY to entries you queued with session_send: "
                 "a person's queued message, or another session's, is never movable here. A "
                 "move to an earlier position may pass only your own entries; a move later is "

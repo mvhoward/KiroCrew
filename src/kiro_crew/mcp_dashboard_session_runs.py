@@ -1450,15 +1450,13 @@ def _run_work_dispatch(args: dict[str, Any], ctx: ToolContext) -> str:
 def _render_session_queue(resp: dict[str, Any]) -> str:
     """Render a ``/api/session-control/queue`` body as compact text.
 
-    The route has already redacted and cut every excerpt; this only formats the
-    listing and leads with what the action did.
+    The route has already redacted and cut every excerpt, and sends one only for
+    the caller's own entries; this only formats the listing and leads with what
+    the action did.
     """
-    state_line = "still working" if resp.get("running") else "idle"
     count = int(resp.get("count") or 0)
-    # The title is editable text too, so it is collapsed like the entry rows below.
     target_text = " ".join(str(resp.get("target") or "").split())
-    title_text = " ".join(str(resp.get("title") or "").split())
-    head = f"\U0001f4e5 `{target_text}` — {title_text} ({state_line}), {count} queued"
+    head = f"\U0001f4e5 `{target_text}`, {count} queued"
     lines: list[str] = []
     if resp.get("moved"):
         lines.append(f"Moved queued entry {resp['moved']} to position {resp.get('position')}.")
@@ -1471,11 +1469,14 @@ def _render_session_queue(resp: dict[str, Any]) -> str:
     for e in entries:
         label = from_labels.get(str(e.get("from")), "other ")
         # Every whitespace run, CR, CRLF and U+2028 included, becomes one space: an
-        # entry's text is untrusted, and a line break in it would render as an extra
-        # listing row with a forged position, id and owner label.
-        excerpt = " ".join(str(e.get("excerpt") or "").split())
+        # entry's id and text are untrusted, and a line break in either would render
+        # as an extra listing row with a forged position, id and owner label.
         entry_id = " ".join(str(e.get("id") or "").split())
-        lines.append(f"{e.get('position')}  {entry_id}  {label}  \"{excerpt}\"")
+        row = f"{e.get('position')}  {entry_id}  {label}"
+        if "excerpt" in e:
+            excerpt = " ".join(str(e.get("excerpt") or "").split())
+            row += f'  "{excerpt}"'
+        lines.append(row.rstrip())
     if resp.get("omitted"):
         lines.append(f"({resp['omitted']} more queued entries not shown.)")
     return "\n".join(lines)

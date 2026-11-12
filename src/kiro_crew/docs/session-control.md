@@ -460,17 +460,20 @@ person's message. The queue becomes `q-3c4d`, `q-5e6f`, `q-1a2b`, and the
 person's message still runs first.
 
 ```
-📥 `chat-7` — fix the build (still working), 3 queued
+📥 `chat-7`, 3 queued
 0  q-1a2b  yours   "Then update the changelog for the build fix"
-1  q-3c4d  person  "stop after this one, I'll take over"
+1  q-3c4d  person
 2  q-5e6f  yours   "Fix the failing login test first, it blocks the release"
 ```
 
 - `list` shows the first 50 queued entries in run order; any beyond that are
   counted in `omitted`, not listed. `yours` marks entries you queued;
   `person` marks a message the session's own human typed; `other` is anything
-  else (another session, an app, a scheduled job). Excerpts are redacted and cut
-  to 200 characters.
+  else (another session, an app, a scheduled job). Only your own entries show
+  their text, redacted and cut to 200 characters. A person's entry or another
+  session's shows only its id, its position and who queued it. To see whether
+  the target is still working, use `session_summary`, which follows the same
+  manager line as `session_queue`.
 - `move` puts one of YOUR entries at `position`. It can always move later. It can
   move earlier only past your own entries, so it never jumps ahead of a person's
   message or another session's (`move_blocked`).
@@ -495,11 +498,12 @@ the target then reads the correction last. Moving it ahead would make the older
 message run last and undo the correction.
 
 The target must be a session you manage: one you created, or one handed to you
-with `session_handoff`. Once you hand a session on, you lose its queue as you do
-its transcript (`not_creator`). It passes the same gate as the other
-session tools: an archived session is not open (`target_not_found`), and
-scheduled-run, incognito, app-scoped, channel-linked and mirrored sessions are
-refused.
+with `session_handoff`. With `agent.session_manager_chain` on, it can also be a
+session managed by a session you manage, down the line. Once you hand a session
+on, you lose its queue as you do its transcript (`not_creator`). It passes the
+same gate as the other session tools: an archived session is not open
+(`target_not_found`), and scheduled-run, incognito, app-scoped, channel-linked
+and mirrored sessions are refused.
 
 ### `session_adopt` and `session_release`
 
