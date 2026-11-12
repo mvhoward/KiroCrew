@@ -56,6 +56,16 @@ logger = logging.getLogger("kiro_crew.agent_sdk.backends")
 # ``[provider, model]`` pair -- ``["deepseek-official", "deepseek-v4-flash"]`` -- so
 # the value is passed through exactly as advertised rather than parsed. That is what
 # ``ACP_BACKENDS_ADVERTISED_MODEL_SELECTION`` membership is for.
+#
+# ``ACP_BACKEND_COPILOT`` is a member on the Copilot CLI 1.0.107 capture
+# (``test/fixtures/acp_frames/copilot/model-effort.jsonl``), taken on an
+# account whose plan offers model choice: ``session/new`` advertises a ``model``
+# select (category ``model``) whose ``currentValue`` matches ``models.currentModelId``,
+# and a ``model`` write answers with the switched select. Its ``-32602`` reads as a
+# value refusal (``handshake-live.jsonl``: a refused ``allow_all`` value), and an
+# unknown option id answers "Unknown config option", so a session on a plan with
+# only ``auto`` -- whose ``session/new`` advertises no ``model`` select, as every
+# 1.0.100 capture beside it shows -- keeps its default when a pin is inherited.
 ACP_BACKENDS_MODEL_VIA_CONFIG_OPTION = frozenset(
     {
         ACP_BACKEND_CLAUDE,
@@ -64,6 +74,7 @@ ACP_BACKENDS_MODEL_VIA_CONFIG_OPTION = frozenset(
         ACP_BACKEND_PI,
         ACP_BACKEND_GOOSE,
         ACP_BACKEND_DEEPSEEK,
+        ACP_BACKEND_COPILOT,
     }
 )
 
@@ -87,6 +98,28 @@ def model_refusal_phrase(backend: str) -> str:
     so it cannot describe a refused effort or any other option.
     """
     return _MODEL_REFUSAL_PHRASE_BY_BACKEND.get(backend, "")
+
+
+#: How a member of the effort channel below says the CURRENT MODEL takes no effort
+#: level, where the session advertises the option anyway. Copilot CLI 1.0.107 serves
+#: its ``reasoning_effort`` select on every session but answers a write on a model
+#: without that setting with ``-32603`` "Request session.model.setReasoningEffort
+#: failed with message: This model does not support reasoning_effort configuration."
+#: (``test/fixtures/acp_frames/copilot/model-effort.jsonl``). That is neither an
+#: unknown option nor a refused value, so no lower level can succeed either.
+_EFFORT_MODEL_REFUSAL_PHRASE_BY_BACKEND: Mapping[str, str] = {
+    ACP_BACKEND_COPILOT: "does not support reasoning_effort configuration",
+}
+
+
+def effort_refused_by_model(backend: str, exc: BaseException) -> bool:
+    """True when *exc* is *backend* saying its current model has no effort setting.
+
+    ``change_effort`` reads it as "this model has no effort setting": the stored
+    level and overlay roll back, and the change reports False rather than an error.
+    """
+    phrase = _EFFORT_MODEL_REFUSAL_PHRASE_BY_BACKEND.get(backend, "")
+    return bool(phrase) and phrase in str(exc).lower()
 
 
 # Backends that take a reasoning-effort change through
@@ -152,10 +185,20 @@ def model_refusal_phrase(backend: str) -> str:
 # the bare code is a value refusal there too. A ``model`` write resets the variant
 # to the new model's first one, which is why the live switch re-applies the level.
 # ``test/fixtures/acp_frames/opencode/effort-live.jsonl`` is the evidence.
+#
+# copilot IS a member, under ``reasoning_effort`` (category ``thought_level``),
+# offering low, medium, high, xhigh and max, on the Copilot CLI 1.0.107 capture
+# (``test/fixtures/acp_frames/copilot/model-effort.jsonl``). The
+# select is advertised on every session, but the setting is PER MODEL: on the
+# starting model a write answers ``-32603`` "This model does not support
+# reasoning_effort configuration" (``effort_refused_by_model``), and after a model
+# switch a write of ``high`` reads back as ``high``. A session on a plan with only
+# ``auto`` advertises no such select (the 1.0.100 captures), so it writes nothing.
 ACP_BACKENDS_EFFORT_VIA_CONFIG_OPTION = frozenset(
     {
         ACP_BACKEND_CLAUDE,
         ACP_BACKEND_CODEX,
+        ACP_BACKEND_COPILOT,
         ACP_BACKEND_DEEPSEEK,
         ACP_BACKEND_GOOSE,
         ACP_BACKEND_KAS,
@@ -178,7 +221,7 @@ ACP_BACKENDS_MODEL_EFFORT_PAIR_IDS = frozenset({ACP_BACKEND_CODEX})
 
 # The ``configId`` each backend spells its reasoning-effort option with. One home
 # for a fact that is per-harness vocabulary, not a constant: claude-agent-acp
-# advertises ``effort``, codex-acp advertises ``reasoning_effort``, KAS advertises
+# advertises ``effort``, codex-acp and Copilot CLI advertise ``reasoning_effort``, KAS advertises
 # ``effortLevel``, pi-acp advertises ``thought_level`` and goose advertises
 # ``thinking_effort`` (opencode takes the default ``effort``), and a session that
 # writes another one's spelling is answered with "unknown config option" and
@@ -194,6 +237,7 @@ ACP_BACKENDS_MODEL_EFFORT_PAIR_IDS = frozenset({ACP_BACKEND_CODEX})
 # prevent. The function is the export.
 EFFORT_CONFIG_OPTION_IDS: Mapping[str, str] = {
     ACP_BACKEND_CODEX: "reasoning_effort",
+    ACP_BACKEND_COPILOT: "reasoning_effort",
     ACP_BACKEND_DEEPSEEK: "reasoning_effort",
     ACP_BACKEND_GOOSE: "thinking_effort",
     ACP_BACKEND_KAS: "effortLevel",
@@ -440,7 +484,8 @@ def effort_config_option_clear_value(backend: str) -> str | None:
 # from kiro-cli's ``--list-models`` catalog, which names models this harness does not
 # serve, so membership is what makes ``GET /api/models`` answer from copilot's own
 # namespace -- ``auto`` alone until a session advertises more, which a session on a
-# plan with model choice can, through the same capture every member uses.
+# plan with model choice does: on Copilot CLI 1.0.107 ``session/new`` carries a
+# ``models`` block and a ``model`` select (``copilot/model-effort.jsonl``).
 ACP_BACKENDS_ADVERTISED_MODEL_SELECTION = frozenset(
     {
         ACP_BACKEND_CLAUDE,
