@@ -1584,8 +1584,10 @@ if TYPE_CHECKING:  # every owner-defined name in _EXPORTS, for type checkers and
         _TAKEOVER_CATCH_UP_ROUNDS,
         _TAKEOVER_READY_TIMEOUT_S,
         _TAKEOVER_REPLAY_SEND_TIMEOUT_S,
+        _TERMINAL_QUERY_RE,
         _TERMINAL_WS_CLEANUP_TIMEOUT_S,
         _consume_ready_marker,
+        _strip_terminal_queries,
         _write_all,
     )
 

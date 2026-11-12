@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import struct
 import time
 from typing import TYPE_CHECKING, Any
@@ -76,6 +77,31 @@ _STALE_OWNER_ERROR_MESSAGE = "Another connection owns this terminal session"
 
 
 _STALE_OWNER_ERROR_CODE = "displaced"
+
+
+# Questions a program asks the terminal, which xterm.js answers by typing the
+# reply through ``onData``: DSR/CPR (``CSI [?]Ps n``), DA1/DA2 (``CSI [>]Ps c``),
+# DECRQM (``CSI [?]Ps $ p``), DECRQSS (``DCS $ q ... ST``) and the OSC 4/10/11/12
+# colour queries (``OSC 11 ; ? BEL``).
+_TERMINAL_QUERY_RE = re.compile(
+    rb"\x1b\[(?:\??[0-9;]*n|>?[0-9;]*c|\??[0-9;]*\$p)"
+    rb"|\x1bP\$q[^\x1b\x07]*\x1b\\"
+    rb"|\x1b\](?:4(?:;[0-9]+;\?)+|1[0-2](?:;\?)+)(?:\x07|\x1b\\)"
+)
+
+
+def _strip_terminal_queries(data: bytes) -> bytes:
+    """Drop terminal questions from the scrollback replayed on reconnect.
+
+    Replay feeds old output into a freshly reset xterm.js, which answers every
+    question still in it. The program that asked is long done, so the answers
+    reach the shell's line editor as typed junk (``11;rgb:ffff/ffff/ffff;1R``).
+    A question carries no screen state, so removing it changes nothing drawn.
+
+    shortcut: 7-bit ``ESC`` forms only; upgrade if 8-bit C1 queries (0x9b /
+    0x9d) show up in real output.
+    """
+    return _TERMINAL_QUERY_RE.sub(b"", data)
 
 
 def _write_all(fd: int, data: bytes) -> None:
@@ -200,7 +226,7 @@ async def _replace_terminal_ws(
     async with sess.replace_lock:
         async with sess.output_lock:
             sent_output_bytes = sess.output_bytes
-            retained_output = bytes(sess.scrollback)
+            retained = bytes(sess.scrollback)
 
         def catch_up_span() -> int | None:
             """Bytes this candidate still lacks, or None when a live owner would
@@ -231,6 +257,11 @@ async def _replace_terminal_ws(
                 )
             sent_output_bytes = current_output_bytes
             return True
+
+        # The snapshot is history: whoever asked a question in it is not
+        # waiting on this socket. Catch-up bytes stay as they are, since they
+        # are live output that may still want an answer.
+        retained_output = _strip_terminal_queries(retained)
 
         # PTY output continues to the current owner while output_bytes records
         # what this unpublished candidate still needs.
