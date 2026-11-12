@@ -1235,7 +1235,7 @@ nothing. Sources:
 
 | Source | Rows | Notes |
 |---|---|---|
-| `<home>/subagents/<id>/state.json` without `tombstone.json` | `kind=subagent`, `state=recovering`, `attempts=1`, `result_ref=<folder>`, class `unknown` | the same set `list_orphans()` scans; a folder whose state names another id, or is unreadable, is skipped |
+| `<home>/subagents/<id>/state.json` without `tombstone.json` | `kind=subagent`, `state=recovering`, `attempts=1`, `result_ref=<folder>`, class `unknown` | the same set `list_orphans()` scans; a folder whose state names another id, or is unreadable, is skipped; a `max_turns` of `"unlimited"` (or `infinite`, `inf`, `no limit`, `none`, or a JSON `Infinity`) imports as `SUBAGENT_MAX_TURNS_CEILING`, the largest cap the runner allows, since `0` means "not set" and falls back to the configured default; any other value `int()` cannot read imports as `0` with a warning, so one bad folder never costs the others their rows |
 | TaskRunner `runs.json` entries with `status=="paused"` | `id=taskrunner:<task_id>`, `kind=taskrunner_step`, `state=recovering`, `scope_ref={"auto_approve": false}` | `runs.json` lives in the runner's work dir, so its path is a parameter of `open_default_store`; the persisted `auto_approve` is never carried |
 
 Old files are never deleted or rewritten.
@@ -1623,7 +1623,11 @@ one.
 `classify_exception(exc, scope)` runs the registered adapters in order —
 `github` (headers, GraphQL `errors[]`, `gh` stderr wording), `http` (status
 codes, `Retry-After` delay-seconds or HTTP-date, `X-RateLimit-Reset` epoch,
-duck-typed over `urllib`/`aiohttp`/`httpx` error shapes) and `acp_provider`
+duck-typed over `urllib`/`aiohttp`/`httpx` error shapes; a retry hint that is
+no usable time, such as a 400-digit `Retry-After`, `inf`, or an instant more
+than 366 days out, from a header or from the error text, is dropped and the
+status-based retry stands, rather than raising out of the adapter or parking
+the task on a wait that never ends) and `acp_provider`
 (reuses the ACP layer's own throttle / usage-limit / auth / 5xx patterns and
 `_is_transient_raw_error`, defined in `acp.transport_errors` and read through
 `acp.client`, so a third copy cannot drift; an `AcpError` tagged

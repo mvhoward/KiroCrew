@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any
 
 from kiro_crew.context_assembly import inclusion as _inclusion
 from kiro_crew.context_assembly import markers as _markers
+from kiro_crew.context_assembly import mcp_servers as _mcp_servers
 from kiro_crew.context_assembly import member as _member
 from kiro_crew.context_assembly import sections as _sections
 from kiro_crew.context_assembly import turn as _turn
@@ -107,6 +108,7 @@ def build_message(
     directive_user_origin: bool = False,
     conversation_reset: bool = False,
     tab_notices: list[Callable[[bool], None]] | None = None,
+    include_channel_history: bool = True,
 ) -> tuple[str, HookResult]:
     """Build the full message with context and hook processing.
 
@@ -162,6 +164,12 @@ def build_message(
     queued on the dashboard tab showing the conversation go ahead of *text*, as a
     dashboard turn in that tab sends them, the call that settles them is put in the
     list, and they leave the queue only once that settle reports the turn landed.
+
+    Pass *include_channel_history* ``False`` to keep *channel_id*'s buffered
+    recent channel messages out of the prompt while *channel_id* and
+    *thread_ts* still label the fenced thread blocks. A dashboard turn handed
+    only a thread parent does this: the parent is the one Slack text it was
+    given, and the channel buffer is a different, wider read.
 
     *provider_type* names the harness serving the session. A context
     provider that carries an :class:`EssentialDelivery` names it in place of
@@ -651,7 +659,12 @@ def build_message(
     # replaces this leg: the replies come from Slack itself, screened, so
     # this app's own replies and those before the last turn are left out
     # here too, rather than shown twice through an unscreened path.
-    if channel_id and self.channel_history and not (thread_ts and thread_replies_text):
+    if (
+        include_channel_history
+        and channel_id
+        and self.channel_history
+        and not (thread_ts and thread_replies_text)
+    ):
         ch_ctx = self.channel_history.context_for(channel_id, thread_ts=thread_ts) or None
         if ch_ctx:
             # Group-channel context is authored by other users — scrub the
@@ -724,6 +737,14 @@ def build_message(
             request_prefix_context=request_prefix_context,
         )
     )
+    # The MCP servers this session cannot use yet, so the model says a server is
+    # still starting (and waits for it) instead of saying it does not exist.
+    if not minimal_context and (
+        _mcp_block := _mcp_servers.turn_block(
+            self, session_key, rebuilt=is_new_session or needs_reinjection
+        )
+    ):
+        parts.append(_mcp_block)
 
     # Reset the per-session skill-body record on any turn that owns the one-shot
     # window-rebuild flag (fresh session or first turn after a compaction), match

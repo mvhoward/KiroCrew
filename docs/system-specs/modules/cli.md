@@ -370,7 +370,7 @@ choice blob makes the usage line unreadable.
 | `kirocrew learn add/list/remove` | Manage learned corrections. `add --applies always\|on_topic` states the lesson's tier with the same two values, the same `LEARN_ADD_SCHEMA` check and the same origin gate as the `learn_add` tool's `applies` field; omitted, the row is unstated. `remove <query>` that matches no lesson writes `No lessons match: <query>` to stderr and exits 1, so a script can tell a miss from a delete. `add` refused because `memory.persistence_enabled` or `memory.writes_enabled` is off writes `Lesson NOT saved: ...` to stderr and exits 1, like a store refusal. |
 | `kirocrew run TASK.md` | Run an autonomous task from a spec file |
 | `kirocrew token` | Print a dashboard access URL with auth token |
-| `kirocrew open [SESSION] [--print]` | Open the Kiro Crew desktop app on a session through its `kirocrew://chat?sid=<key>` URL scheme, or bring the app forward with no session. `--print` writes the URL and opens nothing. The key is checked against the same `sid` grammar as the desktop resolver (`website/electron/deep-link.js`) and a refused key exits 2. That resolver accepts two further shapes the verb does not build, `kirocrew://apps/detail/<name>` (one app's detail page; `<name>` in the manifest's kebab-case app-name grammar, no query) and `kirocrew://remote-crew/add?host=…` (Settings → Remote Crew's add form, filled in; see [instances § Adding a crew from a link](instances.md#adding-a-crew-from-a-link)): a program that wants one opens the URL itself. On macOS and Linux the URL goes to `/usr/bin/open` / `/usr/bin/xdg-open` and the command exits 1 when the launcher reports that no application handles the scheme; Windows uses `os.startfile`. The scheme is registered by the desktop app's installer. |
+| `kirocrew open [SESSION] [--print]` | Open the Kiro Crew desktop app on a session through its `kirocrew://chat?sid=<key>` URL scheme, or bring the app forward with no session. `--print` writes the URL and opens nothing. The key is checked against the same `sid` grammar as the desktop resolver (`website/electron/deep-link.js`) and a refused key exits 2; a percent-encoded key, as the dashboard URL's `?sid=` shows it, is decoded once first. That resolver accepts two further shapes the verb does not build, `kirocrew://apps/detail/<name>` (one app's detail page; `<name>` in the manifest's kebab-case app-name grammar, no query) and `kirocrew://remote-crew/add?host=…` (Settings → Remote Crew's add form, filled in; see [instances § Adding a crew from a link](instances.md#adding-a-crew-from-a-link)): a program that wants one opens the URL itself. On macOS and Linux the URL goes to `/usr/bin/open` / `/usr/bin/xdg-open` and the command exits 1 when the launcher reports that no application handles the scheme; Windows uses `os.startfile`. The scheme is registered by the desktop app's installer. |
 | `kirocrew logout` | Revoke all active dashboard sessions, refresh chains included. A refusal (no gateway, a busy gateway, an ownership-proof refusal, an HTTP error, a not-ok body) prints its reason to stderr and exits 1, like `token`; only the success line prints to stdout, so `kirocrew logout >/dev/null` still shows a failure and a script reading stdout never parses a refusal as a result. `update approve` follows the same split. |
 | `kirocrew manifest` | Generate Slack manifest with user alias auto-populated |
 | `kirocrew update` | Update to latest version (git fetch, pin the upstream commit, refuse a revision whose `requires-python` this venv fails, hard reset to the pinned commit + rebuild; a diverged checkout is refused — `--force` discards its local commits; a successful update ends with the restart hint on every install layout) |
@@ -1058,12 +1058,21 @@ interrupted provisioning run can be found on the next launch attempt.
 
 Launch and connect require the local AWS Session Manager plugin for
 `AWS-StartPortForwardingSession`. If `session-manager-plugin` is missing,
-`cloud launch` prompts to install AWS's official package for the current local
-platform (macOS `.pkg`, Debian/Ubuntu `.deb`, or RPM Linux `.rpm`) before the
-wizard reaches sign-in/dashboard tunneling. `--yes` accepts this installer
-prompt. `cloud connect` performs the same check and installer prompt before
-opening the dashboard tunnel. If installation is declined or fails, the command
-exits non-zero and tells the user to retry after fixing the local prerequisite.
+`cloud launch` says the install needs admin rights and prompts to install AWS's
+official package for the current local platform (macOS `.pkg`, Debian/Ubuntu
+`.deb`, or RPM Linux `.rpm`) before the wizard reaches sign-in/dashboard
+tunneling. `--yes` accepts this installer prompt. `cloud connect` performs the
+same check and installer prompt before opening the dashboard tunnel. Where there
+is no built-in install (Windows, or Linux with neither `dpkg` nor `rpm`) neither
+command prompts; each says so. The install steps run as they are; when one fails
+with no terminal for sudo to ask on and `sudo -n true` fails too, the installer
+says in plain words that sudo needed a password it could not ask for, so a
+sudoers rule for the installer alone still installs. When the plugin is still
+missing (declined, failed, or no built-in install), the command says it stopped
+because the plugin is required, prints this host's install command (AWS's
+install page when there is none; the ownership fix when the install left AWS's
+install tree refused, which a reinstall does not clear) and the command to rerun
+(`kirocrew cloud launch` or `kirocrew cloud connect`), and exits non-zero.
 
 `kirocrew cloud doctor` is read-only and exits 1 when any line is a failure
 (✗): no usable `aws` CLI, a missing or refused Session Manager plugin, or AWS

@@ -64,9 +64,11 @@ records `provider: acp`, the same value kiro-cli does, so it is the row's
 `harness` that tells their turns apart. A row is parsed only when its text holds
 one of those providers or a counted `"harness": "<id>"` member, so on an install
 where none ran the pass costs a substring test per row. A
-session is the row's `transcript` key, else its `slot` through
-`spend_key_for_slot` (so a bare `chat-…` slot joins its `dashboard:chat-…`
-session). It is filed under the
+session is the row's `acp_session_id` (one per ACP session, as kiro-cli writes
+one transcript per session, so each run of a cron job, a heartbeat or a channel
+thread on one slot is its own session), else its `transcript` key, else its
+`slot` through `spend_key_for_slot` (so a bare `chat-…` slot joins its
+`dashboard:chat-…` session). It is filed under the
 local day of its earliest row in the window, the way a transcript is filed under
 its first row's day, and counts two messages per turn (the prompt and the reply,
 the two rows a kiro-cli turn's transcript holds), or one when the row says
@@ -79,8 +81,9 @@ whose sessions do write those transcripts, are counted from them and never twice
 and `test_every_known_harness_is_counted_from_rows_or_from_its_transcripts` makes
 each id in `ACP_BACKENDS_KNOWN` sit in exactly one of the two. A row written
 before the `harness` field records only `provider: acp` and is not counted, as
-before. A session counted from rows that wrote no `transcript` key (a cron job, a
-channel thread) is grouped by its slot for the whole window.
+before. A row written before the `acp_session_id` field that
+has no `transcript` key either (a cron job, a channel thread) is still grouped by
+its slot for the whole window.
 
 When the local session transcript directory does not exist, `/api/usage/kiro`
 returns the same complete zero-valued session statistics as an empty directory,
@@ -3771,7 +3774,8 @@ discarded.
 
 Contract:
 
-- **Request** (`wait` only; every other caller still sends `{}` and is
+- **Request** (`wait`; `mcp_server_wait` sends the body described below; every
+  other caller still sends `{}` and is
   unaffected): `{wait_id, seconds, remaining, interval}`, or
   `{wait_id, wait_done: true}` on the final ping. `wait_id` is a uuid4 hex
   minted per sleep. The body is optional and advisory — a malformed or
@@ -3786,6 +3790,24 @@ Contract:
   naming its own `wait_id` and uses to say which session ended the sleep. The
   tool breaks its loop and returns a normal string — deliberately **not**
   `ToolCancelled`, whose response is suppressed.
+- **`mcp_server_wait`** asks on the same ping what is true of one of the
+  calling session's MCP servers. Request `{"mcp_server": "<name>"}` (trimmed, cut
+  to 128 characters; an empty or non-string value is ignored). The reply adds
+  `{"mcp_server_state": "<state>"}`: `connected`, `connecting`, `failed`,
+  `needs_sign_in`, `disabled`, `registry_dropped`, or `unknown` for a name no
+  report holds and for a session that keeps no report. `unknown` may carry
+  `mcp_server_names`, at most 32 names the caller may have meant, with
+  `mcp_server_names_more` counting the rest, and `mcp_reports_left_out` when
+  the session's report left server reports out at its bound (the server asked
+  about may be one of them, and the tool says that instead of "the host may not
+  report its servers"). The route
+  reads only the report of the session the key names
+  (`agent_sdk.mcp_problems.mcp_server_state`), and the lookup writes nothing
+  (the ping still stamps the session's activity, as every ping does). The tool
+  asks again about a second after each answer and stops asking once
+  `MCP_SERVER_WAIT_SECS` (90 s) have passed; what it tells the model for each
+  state is in
+  [mcp](../../architecture/mcp.md#a-server-that-is-still-starting).
 - **Ping interval** is `mcp_core.WAIT_PING_SECS` (5.0s), not the 60s the
   staleness watchdog alone needs: it is the button's worst-case latency. The
   handler only touches two timestamps, so a 30-minute wait costs ~360 loopback

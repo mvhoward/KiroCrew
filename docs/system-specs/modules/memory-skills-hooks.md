@@ -4147,6 +4147,37 @@ Crossing a startup budget trims only complete lesson entries, never a partial ru
 
 Vector scoring builds one scorer per query (`_stored_similarity_scorer`) so the query vector and its norm are derived once instead of once per lesson — the same hoisting `_sqlite_vector_search` does for episodic rows. There is a numpy path and a stdlib fallback, because numpy is guarded by `_HAS_NUMPY`; both produce the same ranking. Stored lesson vectors are un-normalized (unlike episodic vectors, which are L2-normalized for FAISS inner-product scoring), so both norms are divided out per row rather than assuming unit length. A row whose vector has a different dimensionality than the query — a row written under a previous embedding model — is incomparable and scores 0.0, matching `_sqlite_vector_search` and `HybridRetriever._cosine_similarity`, rather than being truncated against the query's leading elements.
 
+### Recurring tool failures (`failure_recurrence.py`)
+
+A source of CANDIDATE lessons, not a writer of them (#35330). `scan(log, now=, window=)`
+reads `tool_invocation` rows from the security event log with one bounded `recent()`
+call covering the current window and the one before it, and `find_recurring()` groups
+the failed ones (`denied`, `rejected`, `blocked`, `failed`, `failure`, `error`,
+`timeout`, `expired`, and any `denied_*` / `rejected_*` outcome) by signature. It returns `Recurrence` records and
+writes nothing: no lesson, no file, no event. Anything that turns a finding into a
+lesson must show it to the person and write only on their say-so, through
+`write_lesson()` like every other lesson.
+
+- **Signature** = tool kind + MCP tool name (MCP rows only) + `metadata.rule_id` +
+  the error text with paths, long hex ids and numbers collapsed (`normalize_error`,
+  clipped to 120 characters, as are the tool kind, tool name and rule id).
+  `turn_limit` / `child_escalation_limit` key on the error alone, so neither the tool
+  that happened to be running nor its kind splits one class.
+- **The `operation` of a non-MCP row is never read.** For a shell call it is the
+  command line and can hold a secret; a bare MCP tool name is safe. A row is MCP when
+  its tool kind is `mcp`, its `source` is `mcp` (the MCP dispatch refusals, which log
+  the server name as the tool kind), or it names a `downstream_service`.
+- **Recurrence** = two or more sessions, or two or more UTC days. One burst in one
+  session on one day is not recurrence. Rows with an empty `caller_identity` (policy
+  refusals often carry none) count by day only.
+- **Trend** against the window before: `new` (no failures there), `growing` (more
+  now), else `steady`.
+- Other event types (`governance_decision`, `api_access`) and the `feature disabled`
+  error are startup gating, and are skipped.
+- The read stops at `DEFAULT_READ_LIMIT` rows of every event type, newest first. On a
+  busier log the previous window is cut short and more signatures read as `new`; past
+  that many rows in the current window alone, the current window is cut too.
+
 ### Conflict resolution: which layer wins
 
 Priority, highest first. A lower layer never overrides a higher one:
@@ -7384,6 +7415,7 @@ importable from `kiro_crew.context`:
 | `output_contract.py` | the output contract a session starts with: the critical-rules block per runtime (`_critical_rules_for`) and the `[UI LANGUAGE]` steer (`ui_language_tag` stays on the facade) |
 | `tool_names.py` | the provider-specific `[TOOL NAMES]` block: qualified-name compatibility for legacy direct calls, exact catalogue IDs for loading, and unchanged returned IDs for executors; the direct-call fallback never rewrites loader or executor IDs; present at session start, minimal start and after compaction |
 | `session_start.py` | `ContextBuilder.build_session_context`: the session-start block's order, its section timings (`_mark`, `_emit_context_section_timings`) and the redaction of replayed thread history |
+| `mcp_servers.py` | the per-turn `[MCP SERVERS]` block: the servers a session cannot use yet by state, what the model does about each, and the bounded per-session record of what it was last told |
 | `turn_message.py` | `ContextBuilder.build_message`: what one turn sends and in which order, the trigger-matched skill-body delivery and its audit, the request boundary |
 | `agent_spec.py` | the agent prompt (`_resolve_agent_prompt`, `_load_agent_prompt`, `_read_prompt_file`), its templates and the per-session readings they resolve to (`_session_reading`), and the agent-spec reads (`_read_include_crew_context`, `_load_steering_resources`, `steering_target_admissible`) |
 | `delivery_records.py` | per-session records of what a session was already sent: the shown-lesson record's upkeep and the sent skill bodies with their per-turn undo (`rollback_skill_bodies`, `commit_skill_bodies`), and the read of the dashboard-tab sub-agent notices a channel turn's build carries, whose settle call goes to the list that turn owns (`_read_tab_notices`) |
