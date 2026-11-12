@@ -116,14 +116,26 @@ def _register_config_watch(
         # subagent role is read live at spawn and needs no rebuild.
         if not change.touched("agent.role_models.background"):
             return
-        try:
-            from kiro_crew.agent import rebuild_agent_config
+        from kiro_crew.agent import _decline_shared_agent_home, rebuild_agent_config_reporting
 
-            await asyncio.to_thread(rebuild_agent_config)
-            logger.info("agent.role_models.background changed -- background agent specs rebuilt")
-        except Exception:
-            # PlatformCompositionError too: boot enforces composition; the previous spec stays.
-            logger.warning("background-model rebuild failed", exc_info=True)
+        # Raised, never swallowed: ConfigWatch retries only an applier that
+        # raises, so a failed or unwritten rebuild would otherwise leave the
+        # specs on the previous background model until a restart.
+        # PlatformCompositionError raises here too; the previous spec stays.
+        #
+        # The shared-home guard is asked first, without its audit row: its "no"
+        # covers both foreign specs and specs it could not read, and only the
+        # second can clear, so it is retried rather than accepted. Asking before
+        # the rebuild keeps each retry to this read, with no denied row per tick.
+        if await asyncio.to_thread(_decline_shared_agent_home, audit=False) is not None:
+            raise RuntimeError(
+                "background agent specs not rebuilt: the shared agent home is not "
+                "this instance's to write (or its specs could not be read)"
+            )
+        _spec_path, wrote = await asyncio.to_thread(rebuild_agent_config_reporting)
+        if not wrote:
+            raise RuntimeError("background agent spec rebuild did not write")
+        logger.info("agent.role_models.background changed -- background agent specs rebuilt")
 
     default_model_failure_notified = False
 

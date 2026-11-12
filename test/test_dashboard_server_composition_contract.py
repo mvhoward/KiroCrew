@@ -376,7 +376,7 @@ def test_the_shared_state_keeps_its_identity() -> None:
 #: file had it: inside the function that needs it.
 _LAZY_IMPORTS = {
     "kiro_crew": "_hist_mod _rs crew_pause crewmate_harness_notice model_registry stt",
-    "kiro_crew.agent": "rebuild_agent_config rebuild_agent_config_reporting",
+    "kiro_crew.agent": "_decline_shared_agent_home rebuild_agent_config rebuild_agent_config_reporting",
     "kiro_crew.change_card_catalog": "HOOKED_ROUTES",
     "kiro_crew.apps.bridges": "reconcile_enabled_app_resources",
     "kiro_crew.apps.builtin_adoption": (
@@ -495,7 +495,7 @@ def test_the_lazy_imports_stay_inside_the_functions_that_need_them() -> None:
                     for alias in node.names:
                         local.setdefault(alias.asname or alias.name, set()).add(alias.name)
     assert local == {name: {module} for name, module in expected.items()}
-    assert len(expected) == 150
+    assert len(expected) == 151
 
 
 def test_a_star_import_carries_the_moved_public_names(tmp_path: Path) -> None:
