@@ -21,7 +21,7 @@
 1 src/kiro_crew/apps/registry_pipeline/recovery.py
 1 src/kiro_crew/autonudge_service/firing.py
 3 src/kiro_crew/cli_server.py
-2 src/kiro_crew/dashboard/chat_api/session_relaunch.py
+1 src/kiro_crew/dashboard/chat_api/session_relaunch.py
 2 src/kiro_crew/dashboard/file_api/uploads.py
 5 src/kiro_crew/dashboard/file_api/workspaces.py
 1 src/kiro_crew/dashboard/file_index.py
