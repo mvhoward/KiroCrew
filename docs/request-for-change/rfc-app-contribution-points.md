@@ -634,6 +634,9 @@ MCP gateway, so tool discovery, approval and audit stay in the core.
   allowed it.
 
 A separate RFC will specify this section in full before any of it is built.
+For third-party apps, that RFC is
+[rfc-app-agent-tools-third-party-grant.md](rfc-app-agent-tools-third-party-grant.md)
+(`accepted`).
 
 ## 8. Roadmap
 
