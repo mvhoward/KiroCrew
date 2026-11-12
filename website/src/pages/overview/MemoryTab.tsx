@@ -19,6 +19,7 @@ import MemoryStoreCard, {
 import MemoryCarveCard from './MemoryCarveCard'
 import MemoryRetiredCard from './MemoryRetiredCard'
 import MemoryBackupsCard from './MemoryBackupsCard'
+import MemoryFailuresCard from './MemoryFailuresCard'
 import MemberMemoryPanel from './MemberMemoryPanel'
 import MemoryRecordsEditor from './MemoryRecordsEditor'
 import MemoryDocCard from './MemoryDocCard'
@@ -854,6 +855,12 @@ function GlobalMemoryTab({ refreshTrigger, onDirtyChange, focusLessons = false }
     {storeReadable && <MemoryCarveCard key={`carve-${store}`} store={store} />}
     {storeReadable && <MemoryRetiredCard key={`retired-${store}`} store={store} />}
     <MemoryBackupsCard key={`backups-${store}`} store={store} />
+    {/* Its open draft joins the page's leave guards through `docDirty`. */}
+    <MemoryFailuresCard
+      refreshTrigger={refreshTrigger}
+      onLessonSaved={loadLessons}
+      onDirtyChange={d => setDocDirty(old => old.failures === d ? old : { ...old, failures: d })}
+    />
     {!vectorActive && (
       <Card id={LESSONS_CARD_ID}><CardTitle>{i18nT('pages.overview.memoryTab.lessons')} <InfoTip text={i18nT('pages.overview.memoryTab.persistent_lessons_injected_into_every_session_a')} /></CardTitle>
       <div className="flex gap-2 items-center flex-wrap mb-3">
