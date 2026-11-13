@@ -278,6 +278,7 @@ from kiro_crew.dashboard.chat_api.slot_create import (  # noqa: F401
     api_chat_slot_create,
 )
 from kiro_crew.dashboard.chat_api.slot_detail import (  # noqa: F401
+    SLOT_DETAIL_PAGE_BYTE_BUDGET,
     _append_unflushed_tail,
     _append_unflushed_tail_from_offset,
     _bounded_slot_page,
@@ -290,6 +291,7 @@ from kiro_crew.dashboard.chat_api.slot_detail import (  # noqa: F401
     _is_answered_permission,
     _load_redacted,
     _note_owner_focus,
+    _oldest_over_byte_budget,
     _same_persisted_body,
     _snapshot_slot_window,
     api_chat_slot_detail,
