@@ -209,6 +209,14 @@ class TestSuccess:
         headers = {k.lower(): v for k, v in cps.requests[0].header_items()}
         assert headers["tokentype"] == "EXTERNAL_IDP"
 
+    def test_kiro_cps_url_redirects_the_policy_read(self, enterprise, vault, cps, monkeypatch):
+        """The policy read follows the sign-in's control plane, so a gamma account reads gamma."""
+        monkeypatch.setenv("KIRO_CPS_URL", "https://management.gamma.example.test")
+        vault()
+        epf.fetch(_request())
+        (req,) = cps.requests
+        assert req.full_url == "https://management.gamma.example.test/"
+
     def test_an_unchanged_answer_keeps_the_cached_copy(self, enterprise, vault, cps):
         vault()
         first = epf.fetch(_request())

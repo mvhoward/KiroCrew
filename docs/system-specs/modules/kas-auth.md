@@ -289,6 +289,13 @@ The poll ends as `error`, with nothing stored, when every host refused or none l
 a profile (`no available Kiro profiles`); a connection failure is not skipped and
 raises out of the poll, since this leg has no transport budget (above).
 
+`KIRO_CPS_URL`, set in the gateway's environment to an `https://` URL, replaces the
+table: the listing asks only that host, and `control_plane_url` (so the LTS policy
+fetch in `platform/enterprise_policy_fetch.py`) answers it for every region. This is
+how an account whose profile lives on a non-production control plane (a gamma
+Identity Center user) signs in. Any other value is ignored with a warning, since the
+bearer token is sent to it; unset, nothing changes.
+
 ### External IdP (enterprise SSO) — independent
 
 Portal returns IdP metadata (`issuer_url`, `client_id`, `scopes`, `login_hint`,
