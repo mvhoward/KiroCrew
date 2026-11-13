@@ -1201,14 +1201,72 @@ gateway and offers no tools. Out of scope: an app-registered
 server (whether an app may name a vault secret is a separate decision) and a
 hand-written agent file that Kiro Crew does not rebuild.
 
+**Typed items (`secrets/items.py`).** An entry is one ciphertext under one
+name; `items.py` decides what the PLAINTEXT inside it looks like. Three types:
+`secret` (the plaintext IS the value, no wrapper -- every entry stored before
+types existed is this type byte for byte, so nothing migrates), `login`
+(`username`, `password`, `urls` as plain http(s) addresses that may not carry a username or
+password, and `notes`, as one canonical JSON object) and `note` (`text`). The type sits in
+the entry in the clear (`type`, with `updated_at`) so a listing can group
+without decrypting, and it is bound into the AES-GCM AAD
+(`v1 + scope + NUL + name + NUL + type`; a `secret` keeps the original
+name-only AAD), so relabelling an entry's type in the store makes it fail to
+decrypt instead of being read as another type. A login's URL and username are
+INSIDE the ciphertext, not in the plaintext index, because a store that leaked
+would otherwise say which sites a person has an account on. Bounds: a login or
+note field is at most `MAX_FIELD_CHARS` (a plain secret's value keeps no bound,
+as before item types), a login carries at most `MAX_LOGIN_URLS`; every
+value is kept as given (only the emptiness check strips). A login keeps no
+one-time-password seed.
+
+A reference is `secret://NAME` or `secret://NAME#FIELD` (`items.parse_reference`
+splits on the FIRST `#`; the dashboard write therefore refuses a name holding
+`#`, and an entry already stored under such a name still resolves whole,
+because `resolve_secret_uris` tries the whole text first). `#FIELD` is read by
+MCP server env resolution (`mcp_gateway/secret_uri.py`) only; the channel
+credential and agent env readers take the whole text as the name. With no field the reference means the type's
+DEFAULT field (`password` for a login, `text` for a note, the value for a
+secret), and `SecretVault.get` / `get_many` / `get_with_revision` answer that
+same default, so every consumer written for a plain secret keeps working when
+the entry under that name becomes a login. An unknown field fails
+closed with an `ItemError` whose `code` is stable
+(`unknown_field`); the
+resolver's message names only the env-var key and that code, never the name or
+a value. The whole item is `get_items_many`; the write is
+`set_item_with_revision`, which validates through `items.validate_item` inside
+the store lock and writes a `secret` item as exactly the entry
+`set_with_revision` writes. Updating an item of the same type, a field a
+listing never shows (`items.KEPT_WHEN_ABSENT`: a login's `password`,
+`notes`; a note's `text`) that the request leaves out keeps its stored value,
+read and rewritten under that one lock; `notes` sent as `""` is cleared, while
+`password` and `text` are required, so `""` for either is refused
+(`missing_field`). That is
+what lets the edit form, which cannot show those fields, save without erasing
+them. With the `secrets_vault` feature preview off, `GET /api/secrets` answers
+as before typed items: names only (`list_names`), no `items`, nothing
+decrypted. With it on, a listing decrypts each typed item for its public fields
+(`get_items_readable`); one whose own ciphertext fails to decrypt is listed
+with `corrupt: true` so it can be deleted, and the rest still list. A missing
+or unreadable key file, or a key that opens no stored entry (another
+install's key beside a restored store), is not a per-item failure: the listing answers
+`500 vault_unreadable` and marks nothing corrupt, because every entry is intact
+and restoring the key is the fix.
+
 Security properties:
 
-- **Write-only surface.** The vault is stored (`POST /api/secrets`), listed by
-  name (`GET /api/secrets` — names only, values never returned) and deleted
+- **Write-only surface.** The vault is stored (`POST /api/secrets`, a plain
+  `{"name","value"}` or a typed `{"name","type","fields"}`), listed
+  (`GET /api/secrets` -- `names`, plus `items` with each entry's `type`,
+  `revision`, `updated_at` and a login's `fields` = `items.public_view`:
+  username and URLs; never a password, seed, note text or secret
+  value) and deleted
   (`DELETE /api/secrets/{name}`) from the dashboard **Settings → Secrets** tab,
   all behind `_owner_only`. There is deliberately **no** read-back path, on the
-  CLI or the API — a stored value cannot be retrieved, only replaced or
+  CLI or the API — a stored credential cannot be retrieved, only replaced or
   deleted, so a prompt-injected agent has no oracle to exfiltrate it through.
+  The public fields of a login are decrypted on the gateway for that listing;
+  they are the part of the item a password manager shows in its list and are
+  not credentials.
   A store answers with the stored entry's `revision`, a short digest of its
   ciphertext under a fresh nonce that says nothing about the value, and
   `DELETE /api/secrets/{name}?if_revision=` deletes only while the entry still
@@ -2238,6 +2296,7 @@ exactly `outbound` so a second spelling cannot accrete.
 - **Cross-chunk streaming redaction** (`StreamRedactor`): per-chunk redaction misses a credential split across a token/streaming/Slack chunk boundary (a chunk ending `...AKIA` and the next starting `IOSFODNN7...` each individually escape `redact_credentials()`, so raw fragments reach WebSocket/SSE/Slack consumers). `StreamRedactor` is a rolling-buffer redactor: it withholds the trailing run of credential-class characters (`_CRED_CLASS` — letters/digits + URL/base64/connection-string punctuation, the possible start of a not-yet-complete credential) until a non-credential-class terminator arrives or the stream ends, then rejoins and redacts before emitting on the wire. Holdback is bounded by `_STREAM_HOLDBACK_MAX = 512` (larger than the longest fixed-format credential) so a split token is always rejoined; `flush()` redacts the buffered remainder at segment/stream end. Adds at most one chunk of latency. **Streaming JWT/JWE ceiling**: JWTs (esp. RS256/ES256 with embedded claims) routinely exceed 512 chars, so a terminal token longer than the DoS floor would otherwise be bisected — the first `len-512` chars emitted raw before `flush()` redacts only the held tail. When the withheld tail matches `_PARTIAL_JWT_TAIL_RE` (`eyJ…` optionally followed by up to FOUR `.`-separated base64url segments — `{0,4}`, so a 5-segment compact JWE escalates too, matching the batch JWE ceiling — anchored to buffer end) the cap is raised to `_STREAM_HOLDBACK_JWT_MAX = 4096` so the whole token is rejoined before emission; the 512-char floor still applies to every non-credential run. A trailing in-progress `?token=`/`&token=` parameter value (`_TOKEN_PARAM_PARTIAL_RE`, mirroring the batch pass-4 anchor incl. its case-folded name and value class) escalates the same way — without it a >=512-char opaque token value would be bisected at the floor, committing the `token=` anchor into the redacted prefix while the anchor-less tail reached `flush()` and streamed raw. **Split-Bearer holdback**: an `Authorization: Bearer <token>` header spans whitespace (not in `_CRED_CLASS`), so the cred-class run alone would commit the `Authorization: Bearer ` prefix and leak the token on the next chunk. `_BEARER_ANCHOR_PARTIAL_RE` (case-insensitive, JSON-aware, `\Z`-anchored, matching any prefix of an in-progress `Authorization: Bearer <token>`) makes `feed` pull the commit index back to the anchor start (`i = min(i, anchor.start())`), holding header + token together, and escalates the cap so an opaque OAuth/refresh/SSO Bearer token >512 chars (no `eyJ`) is not bisected either. **Fail-closed ceiling**: when a credential-anchored tail (JWT/JWE/Bearer) exceeds the 4096 ceiling, `feed` FAILS CLOSED — it redacts+emits the confirmed-safe prefix, appends `_REDACTED_CREDENTIAL_TAG` (`[REDACTED: credential]`, shared with the batch redactor), and DROPS the oversized tail rather than bisecting it; a plain cred-class run with NO credential anchor is still committed verbatim (bisected — no data loss, DoS bound intact)
 - **Streamed canonical-tag fixed point:** a chunk boundary after the interior space in a member of `CREDENTIAL_REDACTION_TAGS` would let token-parameter pass 4 re-redact the `[REDACTED:` head and duplicate the remaining label, so `StreamRedactor.feed()` pulls its safety cut back when the buffer tail is a STRICT prefix of a module-owned canonical tag. The lookback is bounded by the longest registered tag; a complete tag commits normally; and the cut is applied after STRONG classification, so it never raises the DoS cap or authorizes a fail-closed drop. An incomplete prefix at `flush()` remains ordinary text.
 - **A tool call or an approval prompt does not end the dashboard's redaction window.** The dashboard runner cuts the reply into rows at each tool call and approval prompt, but the model's text on either side is one run of characters, so a credential can start before the cut and finish after it; flushing `_wsred` there would stream and save both halves unmatched. So the cut (`chat_runner._cut_segment`) leaves the run the wire redactor still withholds in the redactor and off the row it was cut from, when the whole segment's save shows that run as written (a run the save already redacts ends a value the segment holds whole, and the window ends there as at the reply's end). The redactor's next output settles it (`_settle_held`), judged on raw text, never on the redacted output (a pass that keeps a label and replaces only its value, like `?token=`, leaves the label on the output as written): when the raw run redacted together with the raw text after it (the slot's raw segment copy) equals the run unchanged followed by that text redacted alone (`_stands_alone`), no value starts in one and ends in the other, and the run is a word of its own and goes back on its row (`_give_back_run`: the row's content is patched in place, with the save's glued-footer repair run over the rebuilt text, and open tabs get a `chat_message_update` in the row's display form); otherwise the run opens the segment it continued into (`_open_segment_with`: prepended to the raw copy and the streamed text), so that row's whole-text save and the linked-channel final reply redact the credential as one text, and its placeholder sits in the segment where the credential completed. Narration before the cut stays on its row and out of the final reply. One piece per cut crossed before any output, so a run held over several cuts goes back piece by piece; a segment wholly held at its cut keeps an empty row until its piece returns (an empty row draws nothing: `isHiddenInvisibleAssistantRow`, and the Mochi panel's `ChatPanel` skips it the same way). A run given back reaches open tabs as that row patch, not as a `chat_chunk`; the Mochi panel takes the same patch (`panelBridge` hands it on as a `_patch` frame keyed by the row's `mid`). It is also queued on the slot's delivery queue as the `chunk` row it was held back from (`push_wire_frame`: not in the window, which already holds it, and not on the WebSocket), so the /api/chat SSE stream and the OpenAI-compatible replies, which join the chunks they drain, carry every word in order. A held run is also settled at the reply's end, at a steer cut and before a compaction, `/clear` or agent-switch reset drops the segment (`_drop_wire_tail`), and on an abnormal end (`_persist_partial_reply`, which at a shutdown also saves a row the run went back on, since the graceful save ran before it). The Slack stream carries its held run across a `wait` the same way (`move_back`, `_give_back`). The crew log's `message/sent` for the row is written at the cut, ahead of the tool call, without the held run; a run given back is written as its own `message/sent` under the same turn and model call (`_log_given_back`), so a model call's text is its entries joined in order. A run that is one short plain word ending a sentence (`text_redaction.ends_plain_sentence`, the one rule the dashboard cut and the Slack stream share: a letter, up to 18 lowercase letters, an optional short `'` contraction, then `.`, and unchanged by `redact`) is not held when no earlier cut holds a run: no credential starts in such a word or continues through it (every anchored prefix is mixed-case, digit or symbol, the bare base64-class run ends at `.`, and the 20-character cap keeps the Discord shape out), so the cut flushes the redactor and the row keeps its last word while the tool runs. The Slack stream releases the same word before a tool card, a `wait` or an approval prompt (`release_sentence_end`), except while a run carried across an earlier `wait` is still waiting for `_give_back`. Accepted residuals: while a tool runs or an approval waits, the row before it lacks any other held last run, and so does that row's `assistant` frame on the delivery queue, which is sent at the cut (a reader that joins those frames instead of the chunks misses the run). Pinned by `test_chat_runner_redact_across_tool_boundary.py` and, for the tabs that apply the patch, `chatSlice.heldRunPatch.test.ts` (dashboard) and `mochiHeldRunPatch.test.tsx` (Mochi panel).
+- **When the dashboard lets a held tail go.** The dashboard releases a held tail only when more text ends the run, at a display boundary, or when the engine has reported the end of the turn (its `session/prompt` answer). A credential split across chunks is never shown in parts. A held tail that is one plain word ending a sentence (a letter, at most 18 lowercase letters, an optional apostrophe part, one period) and that the redactor leaves unchanged is released at once. Everything else is held as today. `_on_text_chunk` calls `StreamRedactor.release_sentence_end()` after each `feed`: a withheld run that `ends_plain_sentence` accepts (the rule the tool-call cut and the Slack stream already share, described above) is committed with its own chunk, so the reply's last word shows when the engine writes it instead of at the prompt's answer. No later text can make such a word part of a credential, and no pattern needs one on its left to match, so the stream never shows more than it did. It is not always the same byte for byte: text glued to the word is read without it, so a pattern that a `.` on its left switches off (the two-part link token) masks such a run whole on the live stream where the uncut run is masked in its second part; the saved reply is redacted whole as before. A value being dropped is never released this way, and neither is a run the structured detectors still read a unit in (with their switch on, `hvs.` opens a token and is not a sentence end). The release is the dashboard's alone: the Slack stream keeps its own release before a tool card, and the messaging driver and every other consumer of `StreamRedactor` never call the method and hold the run as before. The engine's own end-of-turn frame (KAS's `turn_end`) is deliberately not a release point: the same prompt can still write text after it (a steering continuation, a turn of its own), so a run shown there could be the first half of a value the later text completes. Pinned by `test_stream_tail_release.py`.
 - **A chat segment is saved as its raw copy redacted once.** Chat text is redacted one streamed delta at a time, and a delta boundary can cut a value, so per-delta redaction can leave pieces of it (a blocked link's query after the placeholder its first piece became). The segment flush (`chat_runner._redact_segment`) therefore saves the slot's raw copy of the same deltas, with the same glued-footer reflow the streamed text gets, through both removers once: the same text and records the same reply gets when it streams in one delta. A pass is not monotone in its context (a credential at a delta start, a piece of base64), so each value a per-delta pass replaced (`chat_runner._redact_delta`: the addresses `redact_exfiltration_urls_with_records(removed_out=)` hands back and the values of `redact_credentials_with_records(defer_token_param=True)`) is checked on its own against the whole-text result. Default refuse: main's own save (the streamed text redacted again) is the only proof that text is safe to keep. Every run of word characters the saved text shows, blocked-link domains included, must appear in it (`_saved_text_shows_more`); nothing else vouches for a run, so no glued, quoted or forged shape can launder a value a delta's redaction hid, and the segment is withheld instead. A blocked-link record is kept only for a placeholder the saved text holds and when its quoted fields are pieces of main's text or of an address a delta blocked whole (`_links_main_shows`); any other record is dropped and its placeholder stays. The raw copy is never edited to drop a value (a mask changes what the next pass matches). It fails closed and saves `_SEGMENT_UNCHECKED_TEXT` with no records, never the raw text, when: there is no raw copy (past `_SEGMENT_RAW_MAX_CHARS`), the raw copy's hash of per-delta redactions is not the streamed text's, a redaction pass raises, the whole-text result holds such a value more often than the streamed text's own redaction does, or a saved record holds a value a per-delta pass removed as a credential (a blocked link's `url`, `path` or `domain`; a credential record's `view_command`, `profile_command` or source `command`, `path` or `section`). Accepted cost: a reply whose base64 blob a delta cut so a piece of it was removed is withheld. With no streamed deltas the text itself is redacted. Open exposure: the five live `StreamRedactor` sites (`chat_turn/stream_chunks.py` `_wsred` and `_thinkred`, `chat_threads.py`, `handlers/side.py`, `messaging/driver.py`, `slack/handler_runtime/stream.py`) and native subagent card output still redact each chunk alone, so a cut blocked link can reach them in pieces until #20817 lands. The subagent output SSE tail (`handlers/core.py` `api_session_agent_stream`) does not: each poll is redacted and sent up to the start of its last line with text in it, and the rest waits for the next poll; while the part before that line and the rest redact differently apart than together (a value on a line after its label), or a credential match spans that line's start (a Bearer label is kept, so a token cut from it can redact the same apart), all of it waits. The last poll sends what is held, and a hold past `_AGENT_STREAM_HOLD_MAX` characters is redacted and sent as one piece, after which the stream sends nothing but `event: done`, since the next read could carry the rest of a value it cuts. So a link, or a credential with its label, split between two reads is redacted whole; a read that ends after a label's separator or opening quote, before any of a value on a later line, still sends the label's line on its own. The link pass rewrites its blocked links longest first, for every caller, so a blocked link that prefixes a longer blocked one (the same link with a token appended) cannot rewrite the longer one's head and leave its tail; which links are blocked, the warnings and the records are unchanged. The link check, the display pass and `StreamRedactor` are otherwise unchanged.
 - Defense against write-then-execute attacks: even if the LLM tricks kiro-cli into running a credential-extracting script, the output is scrubbed before the LLM can use it in follow-up messages
 
@@ -3951,6 +4010,15 @@ claimed after its servers started is named that way. The managed-tool-policy rea
 goes over the same capability when one is held: with the masked secret it would be
 refused, and that refusal reads as no exclusions, which would let a capability-backed
 call run a tool the operator excluded.
+A server that holds a pickup never asks its gateway for a relayed tool list
+(`mcp_listing_relay.fetch_listing`): it builds its own list, through this read. And
+the gateway builds a relayed list only on an install whose package tree the
+sandbox seals against a session's agent (`sandbox_tiers.install_root_targets_for`,
+the one classification): building it imports listing modules into the gateway,
+outside the sandbox, on a request a session can cause, so on an editable or
+from-source checkout, which stays writable, the gateway answers "build locally"
+before any listing code runs (mcp.md, "A list is relayed only on an install the
+sandbox seals").
 While it holds a capability, `mcp_core_parts.gateway._api_urlopen` sends every request
 to the agent socket through `unix_socket_urlopen` with `X-Ipc-Capability` and without
 `X-Internal-Secret`; it never falls back to TCP. No pickup, or one the gateway
@@ -4289,6 +4357,30 @@ preventing a planted `kiro-cli` basename from selecting the provider's trusted
 internal macOS delegation path. The strict wrapper additionally hides the
 configured data home, `~/.kiro/crew`, `~/.kirocrew`, and all known Kiro
 identity stores, so setup probes cannot read Kiro Crew state or bearer tokens.
+
+The Tool Search gate's read of a kiro-cli found only through `PATH`
+(`kiro_cli_path_probe`) is the same shape and follows one rule: **the probe
+never has more reach than the session's own launch of the same file.** `PATH`
+can lead with a directory an agent writes to, so its `--version` runs through
+the same runner as the candidate probes above (`kiro_prerequisite._run_process`,
+`sandboxed_spawn_argv(mode="strict")` behind the system `env` entry, output
+captured up to the runner's fixed bound and the process tree ended on a
+timeout), with
+the `--version` probe environment above and nothing else. A host with no
+sandbox backend is refused by the chokepoint itself. The runner's
+`require_crew_sandbox` keyword, which only this read passes, refuses the spawn
+with no child started when the
+wrap did not put the child in Kiro Crew's own sandbox (an
+unsandboxed opt-in, a gateway that itself runs inside a sandbox); every other
+caller of the runner leaves it off and runs as before. The read is not
+run on Windows, which has no sandbox backend. It adds no seal and no mask: the
+keyword only declines to run. Every such case answers "unknown", which keeps
+Kiro Crew's own MCP servers out of deferral. The pinned install and an absolute
+`KIROCREW_KIRO_BIN` keep their own read (`kiro_cli_version_at`), which runs
+inside the sandbox at the configured tier, as a session runs the same binary
+(`kiro_cli._sandboxed_probe`; its fixed argv still runs on a host with no
+sandbox backend); no file is added to that route.
+
 Trust is "the CLI runs, and it has a valid login": a Kiro CLI that answers
 `--version` is eligible for `whoami`, regardless of install
 source, owner, or fixed path. Kiro Crew is not the authority on where Kiro CLI
