@@ -34,6 +34,7 @@ import {
   openPoint,
   toolArgsSwitch,
   stubGateway,
+  stubHostedProvider,
 } from '../../test/decisionsCardTestUtils'
 
 /** An older gateway has no consent route: the client rejects with a 404. */
@@ -273,7 +274,7 @@ describe('Decisions (Jev) preview card', () => {
     renderSection()
     // The refusal text is behind the lazy DecisionsProviderPicker boundary.
     await waitFor(() => {
-      expect(screen.getByText(/policy blocks Jev/)).toBeInTheDocument()
+      expect(screen.getByText(/administrator does not allow Jev/)).toBeInTheDocument()
     }, { timeout: 5000 })
     expect(screen.queryByText(/No decision model is chosen/)).toBeNull()
     expect(decisionsSwitch().getAttribute('aria-checked')).toBe('false')
@@ -295,10 +296,12 @@ describe('Decisions (Jev) preview card', () => {
       sagemaker_available: true,
     } as never)
     renderSection()
+    // The line naming the refusal, and the SageMaker entry itself drawn refused.
     await waitFor(() => {
-      expect(screen.getByText(/Turned off by your organization's policy/)).toBeInTheDocument()
+      expect(screen.getAllByText(/Not allowed by your administrator/)).toHaveLength(2)
     }, { timeout: 5000 })
-    expect(screen.queryByText(/policy blocks Jev/)).toBeNull()
+    expect(screen.getByRole('radio', { name: 'Your SageMaker endpoint' })).toBeDisabled()
+    expect(screen.queryByText(/administrator does not allow Jev/)).toBeNull()
     expect(screen.queryByText(/^Sent to/)).toBeNull()
     expect(screen.queryByText(/sent over the internet to Jev/i)).toBeNull()
     expect(screen.queryByText('sagemaker://decision-model-a?region=us-west-2')).toBeNull()
@@ -316,9 +319,9 @@ describe('Decisions (Jev) preview card', () => {
     } as never)
     renderSection()
     await waitFor(() => {
-      expect(screen.getByText(/Turned off by your organization's policy/)).toBeInTheDocument()
+      expect(screen.getByText(/Not allowed by your administrator/)).toBeInTheDocument()
     }, { timeout: 5000 })
-    expect(screen.queryByText(/policy blocks Jev/)).toBeNull()
+    expect(screen.queryByText(/administrator does not allow Jev/)).toBeNull()
     expect(screen.queryByText(/^Sent to/)).toBeNull()
     expect(screen.queryByText(/sent over the internet to Jev/i)).toBeNull()
     expect(screen.queryByText('sagemaker://decision-model-a?region=us-west-2')).toBeNull()
@@ -339,7 +342,7 @@ describe('Decisions (Jev) preview card', () => {
     renderSection()
     // The refusal text is behind the lazy DecisionsProviderPicker boundary.
     await waitFor(() => {
-      expect(screen.getByText(/policy blocks Jev/)).toBeInTheDocument()
+      expect(screen.getByText(/administrator does not allow Jev/)).toBeInTheDocument()
     }, { timeout: 5000 })
     expect(decisionsSwitch().getAttribute('aria-checked')).toBe('true')
     expect(decisionsSwitch().getAttribute('aria-disabled')).not.toBe('true')
@@ -583,11 +586,8 @@ describe('Decisions (Jev) preview card', () => {
     // something to send, so a stray click cannot write an empty credential over a key.
     stubGateway(consentOf(true), { decisions: { bucket: 100 } })
     const save = vi.spyOn(api, 'secretsSave').mockResolvedValue({} as never)
+    stubHostedProvider()
     renderSection()
-    await waitFor(() => {
-      expect(screen.getByText('Shared settings', { exact: true })).toBeInTheDocument()
-    })
-    fireEvent.click(screen.getByText('Shared settings', { exact: true }))
     const field = await waitFor(() => screen.getByLabelText('Jev API key'))
     expect(screen.getByRole('button', { name: 'Save key' })).toBeDisabled()
     fireEvent.change(field, { target: { value: 'sk-live-not-a-real-key' } })
@@ -916,11 +916,8 @@ describe('Decisions (Jev) preview card', () => {
 
   describe('the credential never reads a failed read as "no key"', () => {
     const openShared = async () => {
+      stubHostedProvider()
       renderSection()
-      await waitFor(() => {
-        expect(screen.getByText('Shared settings', { exact: true })).toBeInTheDocument()
-      })
-      fireEvent.click(screen.getByText('Shared settings', { exact: true }))
     }
 
     it('says the read failed instead of rendering a set key as unset', async () => {
@@ -936,7 +933,7 @@ describe('Decisions (Jev) preview card', () => {
 
       await openShared()
       await waitFor(() => {
-        expect(screen.getByText(/could not read the settings/i)).toBeInTheDocument()
+        expect(screen.getByText(/could not load secrets/i)).toBeInTheDocument()
       })
       // And no credential write is on offer while the index is unknown.
       expect(screen.queryByRole('button', { name: 'Save key' })).toBeNull()
@@ -967,12 +964,16 @@ describe('Decisions (Jev) preview card', () => {
     vi.spyOn(api, 'models').mockRejectedValue(new Error('no model list'))
     const save = vi.spyOn(api, 'saveDecisionsConsent').mockResolvedValue(consentOf(false) as never)
 
+    // The vault index is read inside the hosted provider's entry, so that entry is open.
+    stubHostedProvider()
     renderSection()
     await waitFor(() => {
       expect(decisionsSwitch()).toHaveAttribute('aria-checked', 'true')
     })
     // The failure is still REPORTED -- this is not a fix that hides it.
-    expect(screen.getByText(/could not read the settings/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText(/could not load secrets/i)).toBeInTheDocument()
+    })
     // And the one control that stops egress is still live.
     expect(decisionsSwitch()).not.toBeDisabled()
     fireEvent.click(decisionsSwitch())
@@ -991,11 +992,8 @@ describe('Decisions (Jev) preview card', () => {
     vi.spyOn(api, 'kirocrewConfig').mockResolvedValue({ decisions: { bucket: 100 } } as never)
     vi.spyOn(api, 'getDecisionsConsent').mockResolvedValue(consentOf(true))
     vi.spyOn(api, 'secretsList').mockResolvedValue({ names: ['TYPESAFE_API_KEY'] } as never)
+    stubHostedProvider()
     renderSection()
-    await waitFor(() => {
-      expect(screen.getByText('Shared settings', { exact: true })).toBeInTheDocument()
-    })
-    fireEvent.click(screen.getByText('Shared settings', { exact: true }))
     const replace = await waitFor(() => screen.getByRole('button', { name: 'Replace key' }))
     expect(replace).toHaveTextContent('Replace key')
     expect(replace).not.toHaveAttribute('aria-label')
@@ -1018,11 +1016,8 @@ describe('Decisions (Jev) preview card', () => {
     }
 
     const openShared = async () => {
+      stubHostedProvider()
       renderSection()
-      await waitFor(() => {
-        expect(screen.getByText('Shared settings', { exact: true })).toBeInTheDocument()
-      })
-      fireEvent.click(screen.getByText('Shared settings', { exact: true }))
       return await waitFor(() => screen.getByRole('button', { name: 'Remove key' }))
     }
 
@@ -1114,6 +1109,7 @@ describe('Decisions (Jev) preview card', () => {
 
   it('offers the credential as a vault entry, set or unset and never a value', async () => {
     stubGateway({ enabled: true })
+    stubHostedProvider()
     renderSection()
     await waitFor(() => {
       expect(screen.getByText('Jev API key')).toBeInTheDocument()
@@ -1339,22 +1335,24 @@ describe('Decisions (Jev) preview card', () => {
   })
 
   describe('capabilities.decisions governance gate', () => {
-    // The card is the door to a PAID external egress, so a managed fleet can
-    // withdraw the whole feature: `GET /api/dashboard/config` reports the ceiling's
-    // answer as `decisions_enabled` and the card is drawn only on a literal `true`.
-    // Fail closed on absence — an older gateway and a read still in flight both
-    // look the same from here, and neither is permission.
+    // The card is the door to a PAID external egress, so an administrator can turn
+    // the whole feature off: `GET /api/dashboard/config` reports the ceiling's answer
+    // as `decisions_enabled`. A literal `false` draws a plain notice saying so and no
+    // control; the controls are drawn only on a literal `true`. Fail closed on
+    // absence: an older gateway and a read still in flight both look the same from
+    // here, and neither is permission.
 
-    it('draws no card when governance withdrew the seam', async () => {
-      stubGateway({ enabled: false }, { decisions: { bucket: 100 } }, { decisions_enabled: false })
+    it('says the administrator turned decision models off, and offers no control', async () => {
+      stubGateway({ enabled: true }, { decisions: { bucket: 100 } }, { decisions_enabled: false })
       renderSection()
-      // A sibling card proves the section rendered, so an absent switch is the
-      // gate and not a failed render.
-      await waitFor(() => {
-        expect(screen.getByRole('switch', { name: /Webhooks/i })).toBeInTheDocument()
-      })
+      const notice = await screen.findByTestId('decisions-admin-disabled')
+      // A plain statement, named for the feature, and not a silently greyed switch.
+      expect(notice).toHaveAttribute('role', 'status')
+      expect(notice.textContent).toContain('Decisions (Jev)')
+      expect(notice.textContent).toContain('Your administrator has turned off decision models')
       expect(screen.queryByRole('switch', { name: 'Decisions (Jev)' })).toBeNull()
-      // Not merely hidden: nothing about the feature is on screen to act on.
+      expect(screen.queryByRole('radiogroup', { name: 'Decision model' })).toBeNull()
+      // Nothing about sending is on screen to act on, even with a recorded consent.
       expect(screen.queryByText(/sent over the internet to Jev/i)).toBeNull()
     })
 

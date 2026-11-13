@@ -184,3 +184,20 @@ export function stubGateway(
     vi.spyOn(api, 'getDecisionsConsent').mockResolvedValue(full)
   }
 }
+
+/**
+ * The hosted provider configured and allowed, so the picker opens its entry and draws
+ * the API key field inside it (`DecisionsHostedKeyField`).
+ */
+export const stubHostedProvider = (overrides: Record<string, unknown> = {}) =>
+  vi.spyOn(api, 'getDecisionsProvider').mockResolvedValue({
+    presets: [],
+    active: 'jev',
+    configured_endpoint: 'https://api.typesafe.ai/v1/systemone',
+    loopback: false,
+    hosted_permitted: true,
+    local_permitted: true,
+    sagemaker_available: true,
+    sagemaker_permitted: true,
+    ...overrides,
+  } as never)

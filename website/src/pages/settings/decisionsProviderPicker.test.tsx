@@ -498,7 +498,7 @@ describe('refused hosted default (round-14 repro)', () => {
 
   it('names the refusal and does not draw the switch as active', async () => {
     await renderPicker({ data: { ...providerOf('none'), hosted_permitted: false } })
-    expect(await screen.findByText(/policy blocks Jev/i)).toBeTruthy()
+    expect(await screen.findByText(/administrator does not allow Jev/i)).toBeTruthy()
   })
 
   it('names SageMaker, not Jev, when only the SageMaker host is refused', async () => {
@@ -511,13 +511,13 @@ describe('refused hosted default (round-14 repro)', () => {
         configured_refused: true,
       },
     })
-    expect(await screen.findByText(/Turned off by your organization's policy/i)).toBeTruthy()
-    expect(screen.queryByText(/policy blocks Jev/i)).toBeNull()
+    expect(await screen.findByText(/Not allowed by your administrator/i)).toBeTruthy()
+    expect(screen.queryByText(/administrator does not allow Jev/i)).toBeNull()
   })
 })
 
 describe('fleet policy', () => {
-  it('hides hosted Jev when policy withdraws it and keeps local models choosable', async () => {
+  it('draws a refused hosted provider greyed with the administrator wording, and keeps local models choosable', async () => {
     vi.spyOn(api, 'getDecisionsProvider').mockResolvedValue({
       ...providerOf('plumb-4b'),
       hosted_permitted: false,
@@ -533,8 +533,10 @@ describe('fleet policy', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByRole('radio', { name: 'Laya' })).not.toBeDisabled()
-    expect(screen.queryByRole('radio', { name: /Jev, hosted by TypeSafe/i })).toBeNull()
-    expect(screen.queryByText(/Turned off by your organization's policy/i)).toBeNull()
+    // Shown, not hidden: a model that vanished would read as one this build lacks.
+    expect(screen.getByRole('radio', { name: /Jev, hosted by TypeSafe/i })).toBeDisabled()
+    const hosted = screen.getByTestId('decisions-provider-hosted-entry')
+    expect(hosted.textContent).toContain('Not allowed by your administrator')
   })
 
   it('keeps "No model" choosable when policy withdraws both sides', async () => {
@@ -570,7 +572,7 @@ describe('fleet policy', () => {
     )
     expect(await screen.findByRole('radio', { name: 'Laya' })).toBeDisabled()
     expect(screen.getByRole('radio', { name: 'Plumb-4B' })).toBeDisabled()
-    expect(screen.getAllByText(/Turned off by your organization's policy/i)).toHaveLength(2)
+    expect(screen.getAllByText(/Not allowed by your administrator/i)).toHaveLength(2)
   })
 })
 
@@ -705,17 +707,17 @@ describe('SageMaker endpoint', () => {
     expect(screen.getByRole('button', { name: 'Test connection' })).toBeDisabled()
   })
 
-  it('is hidden with hosted Jev when a gateway without its own answer withdraws the hosted side', async () => {
+  it('is refused with the hosted provider when a gateway without its own answer withdraws the hosted side', async () => {
     await renderPicker({ data: { ...withSageMaker('none'), hosted_permitted: false } })
     await screen.findByText('Plumb-4B')
-    expect(screen.queryByRole('radio', { name: 'Your SageMaker endpoint' })).toBeNull()
+    expect(screen.getByRole('radio', { name: 'Your SageMaker endpoint' })).toBeDisabled()
   })
 
-  it('is hidden when the ceiling permits no SageMaker runtime host, while hosted Jev stays', async () => {
+  it('is refused when the ceiling permits no SageMaker runtime host, while the hosted provider stays', async () => {
     await renderPicker({ data: { ...withSageMaker('none'), sagemaker_permitted: false } })
     await screen.findByText('Plumb-4B')
-    expect(screen.queryByRole('radio', { name: 'Your SageMaker endpoint' })).toBeNull()
-    expect(screen.getByRole('radio', { name: /Jev, hosted by TypeSafe/i })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Your SageMaker endpoint' })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: /Jev, hosted by TypeSafe/i })).not.toBeDisabled()
   })
 
   it('on a ceiling that allows only SageMaker and loopback, offers SageMaker and local models and no hosted default', async () => {
@@ -732,7 +734,42 @@ describe('SageMaker endpoint', () => {
     expect(sagemaker).not.toBeDisabled()
     expect(screen.getByLabelText('Endpoint name')).toHaveValue('decision-model-a')
     expect(screen.getByLabelText('AWS region')).toHaveValue('us-west-2')
-    expect(screen.queryByRole('radio', { name: /Jev, hosted by TypeSafe/i })).toBeNull()
+    expect(screen.getByRole('radio', { name: /Jev, hosted by TypeSafe/i })).toBeDisabled()
     expect(screen.getByRole('radio', { name: 'Laya' })).not.toBeDisabled()
+  })
+})
+
+describe('the hosted provider entry holds its own API key', () => {
+  it('draws the key field inside the hosted entry while that entry is chosen, and nowhere else', async () => {
+    vi.spyOn(api, 'secretsList').mockResolvedValue({ names: [] } as never)
+    await renderPicker({ active: 'jev' })
+    const entry = screen.getByTestId('decisions-provider-hosted-entry')
+    await waitFor(() => expect(entry.querySelector('[data-testid="decisions-hosted-key"]')).not.toBeNull())
+    expect(screen.getAllByTestId('decisions-hosted-key')).toHaveLength(1)
+    // Choosing another model closes it: the key is not a shared setting.
+    fireEvent.click(screen.getByRole('radio', { name: 'Laya' }))
+    expect(screen.queryByTestId('decisions-hosted-key')).toBeNull()
+  })
+
+  it('opens the hosted entry when settings search aims at its key, whatever answers now', async () => {
+    vi.spyOn(api, 'secretsList').mockResolvedValue({ names: [] } as never)
+    vi.spyOn(api, 'getDecisionsProvider').mockResolvedValue(providerOf('laya'))
+    vi.spyOn(api, 'system').mockResolvedValue({ mem_total_gb: 32 } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <DecisionsProviderPicker frozen={false} openHostedKey />
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByTestId('decisions-hosted-key')).toBeInTheDocument()
+  })
+
+  it('draws no key field for a hosted provider the administrator does not allow', async () => {
+    vi.spyOn(api, 'secretsList').mockResolvedValue({ names: [] } as never)
+    await renderPicker({
+      data: { ...providerOf('none'), provider_permitted: { jev: false, 'plumb-4b': true, laya: true } },
+    })
+    expect(screen.getByRole('radio', { name: /Jev, hosted by TypeSafe/i })).toBeDisabled()
+    expect(screen.queryByTestId('decisions-hosted-key')).toBeNull()
   })
 })

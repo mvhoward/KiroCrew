@@ -78,6 +78,16 @@ This setting alone changes nothing: a chat is only routed while it is not pinned
 
 After setting the provider and sampling values, enable the switch only if the data transfer below is acceptable. Turn it off to return to normal trigger matching. Old `preview` and per-point mode values do not enable this new behavior.
 
+## When your administrator limits decision models
+
+Your administrator's policy can turn decision models off entirely, or allow only some of them.
+
+When decision models are turned off, the Decisions card shows only a notice that your administrator turned them off. Nothing is sent to a decision model and none runs on this machine, so every decision uses the built-in rules.
+
+When only some are allowed, each model that is not allowed is still listed under **Decision model**, greyed out with "Not allowed by your administrator.", and cannot be chosen. Nothing is sent to a model that is not allowed, even if you chose it earlier or wrote its address into `config.json` by hand. A consent you gave stays recorded and counts again if your administrator later allows that model. **No model** is always available.
+
+The hosted provider's API key field is part of that provider's entry under **Decision model**: choose **Jev, hosted by TypeSafe** and the field appears beneath it.
+
 ## Using Cloudflare Clef
 
 Cloudflare's Clef decision model on Workers AI answers the same questions in the same format as Jev, so it works as the Decisions provider. Cloudflare wraps its answer in a `result` object, and Kiro Crew reads either shape. A failure reply carries no `answers` and is refused like any other unusable answer, and nothing from it is logged.
