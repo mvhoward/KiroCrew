@@ -42,6 +42,16 @@ OIDC_SCOPES = (
     "codewhisperer:analysis",
     "codewhisperer:conversations",
 )
+# The same scopes under the prefix a non-prod control plane (gamma, alpha) issues
+# profiles against: a token holding the public ones lists no profile there. Asked
+# for only while the relay viewer points at its own control plane
+# (``tunnel.relay_viewer_cps_url``); prod sign-in keeps OIDC_SCOPES.
+INTERNAL_OIDC_SCOPES = tuple(
+    s.replace("codewhisperer:", "codewhisperer_internal:") for s in OIDC_SCOPES
+)
+# KasToken.extra key recording a registration's scopes when they are not OIDC_SCOPES,
+# so a later sign-in reuses that registration only for the same scopes.
+OIDC_SCOPES_EXTRA_KEY = "oidc_scopes"
 # client_name we register our own public OAuth client under (kiro-cli uses "Kiro CLI").
 OIDC_CLIENT_NAME = "Kiro Crew"
 

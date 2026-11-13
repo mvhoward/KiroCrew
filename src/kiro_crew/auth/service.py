@@ -28,6 +28,8 @@ from kiro_crew.auth.login import builder_id, control_plane, device, portal
 from kiro_crew.auth.login.endpoints import (
     BUILDER_ID_REGION,
     BUILDER_ID_START_URL,
+    INTERNAL_OIDC_SCOPES,
+    OIDC_SCOPES,
     USER_AGENT,
     social_service_url,
 )
@@ -58,6 +60,37 @@ _HTTP_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10)
 # the expected case, not evidence the login failed. Any poll that gets an answer clears
 # the count, so only a sustained outage crosses it.
 MAX_POLL_TRANSPORT_FAILURES = 3
+
+
+def _load_relay_viewer_cps_url() -> str:
+    """``tunnel.relay_viewer_cps_url`` while ``tunnel.relay_viewer_enabled`` is on, else "".
+
+    The config build has already dropped a URL that is not https:// (or loopback
+    http://), so a non-empty value here is one the viewer itself would call. An
+    unreadable config answers "", which keeps the prod-only lookup.
+    """
+    from kiro_crew.config.loader import KiroCrewConfig
+
+    try:
+        tunnel = KiroCrewConfig.load().tunnel
+    except Exception as exc:  # noqa: BLE001 - any failure keeps the prod lookup
+        logger.debug(
+            "relay viewer settings unreadable for the profile lookup (%s)", type(exc).__name__
+        )
+        return ""
+    if getattr(tunnel, "relay_viewer_enabled", False) is not True:
+        return ""
+    url = getattr(tunnel, "relay_viewer_cps_url", "")
+    return url.strip() if isinstance(url, str) else ""
+
+
+async def _relay_viewer_cps_url() -> str:
+    """:func:`_load_relay_viewer_cps_url`, off the event loop (the config read is file I/O)."""
+    from kiro_crew.executors import relay_viewer_executor
+
+    return await asyncio.get_running_loop().run_in_executor(
+        relay_viewer_executor(), _load_relay_viewer_cps_url
+    )
 
 
 class UnknownLoginError(Exception):
@@ -427,8 +460,11 @@ class KasLoginService:
         registration AWS refuses can never stop the user signing in again.
         """
         session = await self._http()
+        # A viewer pointed at its own (non-prod) control plane needs a token with
+        # the internal scopes, or that host lists no profile; prod keeps the public.
+        scopes = INTERNAL_OIDC_SCOPES if await _relay_viewer_cps_url() else OIDC_SCOPES
         stored = await asyncio.to_thread(self._store.load, identity)
-        client = builder_id.stored_client(stored, region)
+        client = builder_id.stored_client(stored, region, scopes)
         auth = None
         if client is not None:
             try:
@@ -440,7 +476,7 @@ class KasLoginService:
             except builder_id.BuilderIdAuthError as err:
                 logger.info("stored SSO-OIDC client refused, registering a new one: %s", err)
         if client is None or auth is None:
-            client = await builder_id.register_client(region, session=session)
+            client = await builder_id.register_client(region, session=session, scopes=scopes)
             auth = await builder_id.start_device_authorization(
                 client, region=region, start_url=start_url, session=session
             )
@@ -663,7 +699,10 @@ class KasLoginService:
             # only when the lookup answered and the list was empty.
             try:
                 listing = await control_plane.list_available_profiles(
-                    token.access_token, region=pending.region, session=session
+                    token.access_token,
+                    region=pending.region,
+                    session=session,
+                    viewer_cps_url=await _relay_viewer_cps_url(),
                 )
             except control_plane.ControlPlaneError as err:
                 logger.warning("could not resolve IdC profile ARN: %s", err)
